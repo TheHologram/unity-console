@@ -1,0 +1,38 @@
+
+Unity-Console is made up of many pieces of code, all of them open source, but
+different pieces of Unity-Console use different licensing terms.
+
+For comments, corrections and updates, please contact 
+TheHologram@users.noreply.github.com
+
+--
+Unmarked/Original files are subject to the Apache License Version 2.0
+
+Copyright (c) The Hologram. All rights reserved.
+
+ This source code is subject to terms and conditions of the Apache License, Version 2.0. A 
+ copy of the license can be found in the License.html file at the root of this distribution. If 
+ you cannot locate the  Apache License, Version 2.0, please send an email to 
+ TheHologram@users.noreply.github.com. By using this source code in any fashion, 
+ you are agreeing to be bound by the terms of the Apache License, Version 2.0.
+
+ You must not remove this notice, or any other, from this software.
+
+--
+mono
+
+Due to Unity's dependance on mono, Unity-Console uses mono as well.
+
+Some files are copied from the mono tools folders and modified to work with 
+unity-console when the defaults do not work the licenses for mono are in 
+LICENSE.mono.  The source files copied are marked indicating the license used.
+
+--
+IronLanguages
+
+Some files are copied from the IronLanguages project (IronPython and IronRuby)
+to provide base functionality.  Originally the project was envisioned to host 
+IronPython in a console but that was not completed.  
+
+Parts related to the Shell scripting in Windows remain.  Those files retain 
+the license that pertains to those files.

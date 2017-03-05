@@ -1,0 +1,10 @@
+/*.db
+/*.opendb
+/*.bat
+/*.snk
+*.user
+obj
+bin
+/temp
+/.vs/unity-console/v14/*.suo
+/.vs

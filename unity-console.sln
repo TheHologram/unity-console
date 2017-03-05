@@ -1,0 +1,61 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.Console", "Unity.Console\Unity.Console.csproj", "{10B0872C-14C8-408E-9122-D1AE07EBD595}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.Console.Plugin", "Unity.Console.Plugin\Unity.Console.Plugin.csproj", "{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.Python.Modules", "Unity.Python.Modules\Unity.Python.Modules.csproj", "{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release|Any CPU = Release|Any CPU
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Debug|Win32.Build.0 = Debug|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Debug|x64.Build.0 = Debug|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Release|Any CPU.Build.0 = Release|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Release|Win32.ActiveCfg = Release|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Release|Win32.Build.0 = Release|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Release|x64.ActiveCfg = Release|Any CPU
+		{10B0872C-14C8-408E-9122-D1AE07EBD595}.Release|x64.Build.0 = Release|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Debug|Win32.Build.0 = Debug|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Debug|x64.Build.0 = Debug|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Release|Win32.ActiveCfg = Release|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Release|Win32.Build.0 = Release|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Release|x64.ActiveCfg = Release|Any CPU
+		{E06F9CE1-5637-48EA-A1F9-E26485F54A4B}.Release|x64.Build.0 = Release|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Debug|Win32.Build.0 = Debug|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Debug|x64.Build.0 = Debug|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Release|Win32.ActiveCfg = Release|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Release|Win32.Build.0 = Release|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Release|x64.ActiveCfg = Release|Any CPU
+		{0BE7E7BF-C934-462E-9C32-DCC6C1DEE4BD}.Release|x64.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
