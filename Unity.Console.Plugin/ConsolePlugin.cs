@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using IllusionPlugin;
+using UnityEngine;
 
 namespace Unity.Console.Plugin
 {
@@ -17,6 +18,12 @@ namespace Unity.Console.Plugin
         static readonly string _consolePath = null;
         static readonly string _iniPath = null;
         static bool _enable = false;
+
+        static readonly KeyCode ShowKey = KeyCode.BackQuote;
+        static readonly bool ShowKeyControl = true;
+        static readonly bool ShowKeyAlt = false;
+        static readonly bool ShowKeyShift = false;
+        static bool _focusWindow = false;
 
         static ConsolePlugin()
         {
@@ -36,6 +43,19 @@ namespace Unity.Console.Plugin
                         {
                             _filters = sb.ToString().Split(",;".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
                         }
+
+                        sb.Length = 0;
+                        try
+                        {
+                            if (0 < GetPrivateProfileString("Console", "ShowKey", "BackQuote", sb, sb.Capacity, _iniPath))
+                                ShowKey = (KeyCode)Enum.Parse(typeof(KeyCode), sb.ToString());
+                        }
+                        catch
+                        {
+                        }
+                        ShowKeyControl  = GetPrivateProfileInt("Console", "ShowKeyControl", 1, _iniPath) != 0;
+                        ShowKeyAlt = GetPrivateProfileInt("Console", "ShowKeyAlt", 0, _iniPath) != 0;
+                        ShowKeyShift = GetPrivateProfileInt("Console", "ShowKeyShift", 0, _iniPath) != 0;
                     }
                 }
             }
@@ -58,29 +78,8 @@ namespace Unity.Console.Plugin
 
         public void OnApplicationQuit()
         {
-            try
-            {
-                _enable = false;
-                if (consoleAssembly == null) return;
-                var progType = consoleAssembly.GetType("Unity.Console.Program", false, true);
-                if (progType != null)
-                {
-                    var initMethod = progType.GetMethod("Shutdown",
-                        BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod);
-                    initMethod.Invoke(null, new object[0]);
-                }
-                runThread?.Abort();
-                //runThread?.Join(1000);
-            }
-            catch (Exception ex)
-            {
-                System.Console.WriteLine("Exception: " + ex.Message);
-                // ignored
-            }
-            finally
-            {
-            }
-            //Unity.Console.Program.Shutdown();
+            _enable = false;
+            Shutdown();
         }
 
         public void OnApplicationStart()
@@ -90,7 +89,7 @@ namespace Unity.Console.Plugin
                 if (!_enable) return;
 
                 if (runThread != null) return;
-              
+
                 if (!string.IsNullOrEmpty(_iniPath) && File.Exists(_iniPath))
                 {
                     string[] lines;
@@ -109,17 +108,99 @@ namespace Unity.Console.Plugin
 
                     }
 
-                    var dllPath = Path.GetFullPath(Path.Combine(_consolePath, @"Unity.Console.dll"));
-                    if (File.Exists(dllPath))
+                    var ShowAtStartup = GetPrivateProfileInt("Console", "ShowAtStartup", 0, _iniPath) != 0;
+                    if (ShowAtStartup)
                     {
-                        consoleAssembly = AppDomain.CurrentDomain.Load(AssemblyName.GetAssemblyName(dllPath));
-                        runThread = new Thread(RunThread) {IsBackground = true};
-                        runThread.Start();
+                        Startup(false);
                     }
                 }
             }
             catch
             {
+            }
+        }
+
+        private void Startup(bool focus)
+        {
+            _focusWindow = focus;
+            if (runThread != null)
+                return;
+            var dllPath = Path.GetFullPath(Path.Combine(_consolePath, @"Unity.Console.dll"));
+            if (File.Exists(dllPath))
+            {
+                consoleAssembly = AppDomain.CurrentDomain.Load(AssemblyName.GetAssemblyName(dllPath));
+                runThread = new Thread(RunThread) {IsBackground = true};
+                runThread.Start();
+            }
+        }
+
+        private void Close()
+        {
+            if (runThread == null)
+                return;
+
+            try
+            {
+                if (consoleAssembly == null) return;
+                var progType = consoleAssembly.GetType("Unity.Console.Program", false, true);
+                if (progType != null)
+                {
+                    var initMethod = progType.GetMethod("Close",
+                        BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod);
+                    initMethod.Invoke(null, new object[0]);
+                }
+                runThread?.Abort();
+                runThread = null;
+                //runThread?.Join(1000);
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine("Exception: " + ex.Message);
+                // ignored
+            }
+            finally
+            {
+            }
+        }
+
+        private void Shutdown()
+        {
+            if (runThread == null)
+                return;
+
+            try
+            {
+                if (consoleAssembly == null) return;
+                var progType = consoleAssembly.GetType("Unity.Console.Program", false, true);
+                if (progType != null)
+                {
+                    var initMethod = progType.GetMethod("Shutdown",
+                        BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod);
+                    initMethod.Invoke(null, new object[0]);
+                }
+                runThread?.Abort();
+                runThread = null;
+                //runThread?.Join(1000);
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine("Exception: " + ex.Message);
+                // ignored
+            }
+            finally
+            {
+            }
+        }
+
+        private void Toggle()
+        {
+            if (runThread == null)
+            {
+                Startup(true);
+            }
+            else
+            {
+                Close();
             }
         }
 
@@ -141,6 +222,31 @@ namespace Unity.Console.Plugin
 
         public void OnUpdate()
         {
+            if (!_enable)
+                return;
+
+            if (Input.GetKeyDown(ShowKey))
+            {
+                bool ControlDown = GetAsyncKeyState(0xA2) != 0 || GetAsyncKeyState(0xA3) != 0;
+                bool AltDown = GetAsyncKeyState(0xA4) != 0 || GetAsyncKeyState(0xA5) != 0;
+                bool ShiftDown = GetAsyncKeyState(0xA0) != 0 || GetAsyncKeyState(0xA1) != 0;
+                System.Console.WriteLine("OnUpdate {0} | {1} {2} {3} | {4} {5} {6}"
+                    , ShowKey
+                    , ControlDown, AltDown, ShiftDown
+                    , ShowKeyControl ^ ControlDown
+                    , ShowKeyAlt ^ AltDown
+                    , ShowKeyShift ^ ShiftDown
+                    );
+                System.Console.WriteLine("OnUpdate" + ControlDown + " " + AltDown + " " + ShiftDown);
+                if (true
+                    && !(ShowKeyControl ^ ControlDown)
+                    && !(ShowKeyAlt ^ AltDown)
+                    && !(ShowKeyShift ^ ShiftDown)
+                    )
+                {
+                    Toggle();
+                }
+            }
         }
 
         private void RunThread()
@@ -154,7 +260,7 @@ namespace Unity.Console.Plugin
                 {
                     var initMethod = progType.GetMethod("Initialize",
                         BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod);
-                    initMethod.Invoke(null, new object[0]);
+                    initMethod.Invoke(null, new object[] { _focusWindow });
                 }
             }
             catch (Exception)
@@ -198,6 +304,9 @@ namespace Unity.Console.Plugin
             section = Encoding.ASCII.GetString(bytes, 0, nbytes).Trim('\0').Split('\0');
             return true;
         }
+
+        [DllImport("user32.dll")]
+        static extern short GetAsyncKeyState(int vKey);
 
     }
 }

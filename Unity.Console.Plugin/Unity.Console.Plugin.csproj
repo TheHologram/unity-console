@@ -37,6 +37,10 @@
       <HintPath>E:\Games\Hentai\HoneySelect\IPA\Data\Managed\IllusionPlugin.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Library\UnityEngine.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConsolePlugin.cs" />

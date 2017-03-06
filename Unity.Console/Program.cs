@@ -20,7 +20,9 @@ namespace Unity.Console
 {
     public static class Program
     {
-        //private static UnityCommandLine cmdline;
+        private static UnityConsole console;
+        private static InternalStream inStream, outStream, errStream;
+
         static readonly string _rootPath = null;
         static readonly string _iniPath = null;
         static readonly int _startdelay = 2000;
@@ -41,13 +43,14 @@ namespace Unity.Console
             }
         }
 
-        public static void Initialize()
+        public static void Initialize(bool focus)
         {
-            Run(true, TimeSpan.FromMilliseconds(_startdelay));
+            Run(true, focus, TimeSpan.FromMilliseconds(_startdelay));
         }
 
         public static void Close()
         {
+            console?.Abort();
             if (IntPtr.Zero != GetConsoleWindow())
             {
                 FreeConsole();
@@ -56,7 +59,7 @@ namespace Unity.Console
 
         public static void Main()
         {
-            Run(false, TimeSpan.Zero);
+            Run(false, false, TimeSpan.Zero);
         }
 
         public static bool FindAssembly(string name, out Assembly result)
@@ -84,84 +87,69 @@ namespace Unity.Console
 
         internal static ScriptEngine MainEngine { get; private set; }
 
-        public static void Run(bool allocConsole, TimeSpan waitTime)
+        public static void Run(bool allocConsole, bool focusWindow, TimeSpan waitTime)
         {
             if (!_enable) return;
 
             System.Threading.Thread.Sleep(waitTime);
 
-            if (allocConsole && IntPtr.Zero == GetConsoleWindow())
+            try
             {
-                var hForeground = GetForegroundWindow();
-                var hActiveHwnd = GetActiveWindow();
-                var hFocusHwnd = GetFocus();
+                if (allocConsole && IntPtr.Zero == GetConsoleWindow())
+                {
+                    var hForeground = GetForegroundWindow();
+                    var hActiveHwnd = GetActiveWindow();
+                    var hFocusHwnd = GetFocus();
 
-                AllocConsole();
-                SetConsoleTitle("Unity Console");
-                SetConsoleCP(65001);
-                SetConsoleOutputCP(65001);
+                    AllocConsole();
+                    SetConsoleTitle("Unity Console");
+                    SetConsoleCP(65001);
+                    SetConsoleOutputCP(65001);
 
-                if (hForeground != IntPtr.Zero)
-                    SetForegroundWindow(hForeground);
-                if (hActiveHwnd != IntPtr.Zero)
-                    SetActiveWindow(hActiveHwnd);
-                if (hFocusHwnd != IntPtr.Zero)
-                    SetFocus(hFocusHwnd);
-
+                    // reset focus
+                    if (!focusWindow)
+                    {
+                        if (hForeground != IntPtr.Zero)
+                            SetForegroundWindow(hForeground);
+                        if (hActiveHwnd != IntPtr.Zero)
+                            SetActiveWindow(hActiveHwnd);
+                        if (hFocusHwnd != IntPtr.Zero)
+                            SetFocus(hFocusHwnd);
+                    }
+                }
             }
-
-            if (Environment.GetEnvironmentVariable("TERM") == null)
-                Environment.SetEnvironmentVariable("TERM", "dumb");
-
-            var inStream = new InternalStream(StandardHandles.STD_INPUT);
-            var outStream = new InternalStream(StandardHandles.STD_OUTPUT);
-            var errStream = new InternalStream(StandardHandles.STD_ERROR);
+            catch 
+            {
+            }
 
             var oldInStream = System.Console.In;
             var oldOutStream = System.Console.Out;
             var oldErrorStream = System.Console.Error;
-
-            System.Console.SetIn(new StreamReader(inStream));
-            System.Console.SetOut(new StreamWriter(outStream) {AutoFlush = true});
-            System.Console.SetError(new StreamWriter(errStream) {AutoFlush = true});
-
-            var stdwriter = new StreamWriter(new InternalStream(StandardHandles.STD_OUTPUT)) {AutoFlush = true};
-            //cmdline = new UnityCommandLine();
-
-            //cmdline.RegisterAssembly(exeAsm);
-
-            string[] lines;
-            if (GetPrivateProfileSection("Images", _iniPath, out lines))
-            {
-                foreach (var line in lines)
-                {
-                    var scname = line.Trim();
-                    if (string.IsNullOrEmpty(scname) || scname.StartsWith(";") || scname.StartsWith("#"))
-                        continue;
-
-                    var scpath = Path.IsPathRooted(scname) ? scname : Path.Combine(_rootPath, scname);
-                    if (File.Exists(scpath))
-                    {
-                        try
-                        {
-                            var asm = System.AppDomain.CurrentDomain.Load(AssemblyName.GetAssemblyName(scpath));
-                            //cmdline.RegisterAssembly(asm);
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Console.WriteLine("ERROR: " + ex.Message);
-                        }
-                    }
-                }
-            }
-
-            var sb = new StringBuilder(4096);
-
             try
             {
+
+                if (Environment.GetEnvironmentVariable("TERM") == null)
+                    Environment.SetEnvironmentVariable("TERM", "dumb");
+
+                if (inStream == null)
+                    inStream = new InternalStream(StandardHandles.STD_INPUT);
+                outStream = new InternalStream(StandardHandles.STD_OUTPUT);
+                errStream = new InternalStream(StandardHandles.STD_ERROR);
+
+                oldInStream = System.Console.In;
+                oldOutStream = System.Console.Out;
+                oldErrorStream = System.Console.Error;
+
+                System.Console.SetIn(new StreamReader(inStream));
+                System.Console.SetOut(new StreamWriter(outStream) { AutoFlush = true });
+                System.Console.SetError(new StreamWriter(errStream) { AutoFlush = true });
+
+                var stdwriter = new StreamWriter(new InternalStream(StandardHandles.STD_OUTPUT)) { AutoFlush = true };
+
                 var runtimeoptions = new Dictionary<string, object>
                 {
-                    ["PrivateBinding"] = true, ["Debug"] = false,
+                    ["PrivateBinding"] = true,
+                    ["Debug"] = false,
                     //["Frames"] = false, ["Tracing"] = false,
                 };
                 var _env = Python.CreateRuntime(runtimeoptions);
@@ -170,6 +158,7 @@ namespace Unity.Console
                 //_pe.SetTrace(OnTraceback);
 
                 var scriptfolders = new List<string>();
+                var sb = new StringBuilder(4096);
                 sb.Length = 0;
                 sb.Capacity = 4096;
                 if (0 < GetPrivateProfileString("Console", "ScriptsFolders", ".", sb, sb.Capacity, _iniPath))
@@ -184,6 +173,7 @@ namespace Unity.Console
                     scriptfolders.Add(Path.GetFullPath(_rootPath));
                 _pe.SetSearchPaths(scriptfolders.ToArray());
 
+                string[] lines;
                 if (GetPrivateProfileSection("Preload.Assemblies", _iniPath, out lines))
                 {
                     foreach (var line in lines)
@@ -211,7 +201,7 @@ namespace Unity.Console
                 }
 
                 var cmdline = new PythonCommandLine();
-                var console = new UnityConsole(cmdline);
+                console = new UnityConsole(cmdline);
                 var options = new PythonConsoleOptions
                 {
                     PrintUsage = false,
@@ -241,7 +231,7 @@ namespace Unity.Console
                 System.Threading.Thread.Sleep(10000);
             }
             MainEngine = null;
-
+            console = null;
             System.Console.SetIn(oldInStream);
             System.Console.SetOut(oldOutStream);
             System.Console.SetError(oldErrorStream);
@@ -249,11 +239,11 @@ namespace Unity.Console
             if (allocConsole)
                 Close();
 
+            _enable = false; // TODO: something goes wrong with console after shutdown and restart
         }
 
         public static void Shutdown()
         {
-            //cmdline?.Stop();
             Close();
             _enable = false;
         }
@@ -275,7 +265,7 @@ namespace Unity.Console
         }
 
         [DllImport("kernel32.dll")]
-        static extern int GetPrivateProfileInt(string lpAppName, string lpKeyName,int nDefault, string lpFileName);
+        static extern int GetPrivateProfileInt(string lpAppName, string lpKeyName, int nDefault, string lpFileName);
 
         [DllImport("kernel32.dll")]
         static extern uint GetPrivateProfileSection(string lpAppName, StringBuilder lpReturnedString, int nSize, string lpFileName);
