@@ -326,7 +326,7 @@ namespace UC
                     {
                         result = new List<string>();
                         foreach (var nm in _commandLine.GetMemberNames(attr))
-                            if (!nm.StartsWith("_"))
+                            if (!nm.StartsWith("_") && !nm.StartsWith("<"))
                                 result.Add(nm);
                     }
 
