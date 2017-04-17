@@ -43,9 +43,12 @@ namespace Unity.Console
             }
         }
 
-        public static void Initialize(bool focus)
+        internal static ScriptEngine MainEngine { get; private set; }
+        internal static ScriptRuntime MainRuntime { get; private set; }
+
+        public static void Initialize(bool startHidden, bool focus)
         {
-            Run(true, focus, TimeSpan.FromMilliseconds(_startdelay));
+            Run(!startHidden, focus, TimeSpan.FromMilliseconds(_startdelay));
         }
 
         public static void Close()
@@ -84,8 +87,6 @@ namespace Unity.Console
             result = null;
             return false;
         }
-
-        internal static ScriptEngine MainEngine { get; private set; }
 
         public static void Run(bool allocConsole, bool focusWindow, TimeSpan waitTime)
         {
@@ -131,106 +132,117 @@ namespace Unity.Console
                 if (Environment.GetEnvironmentVariable("TERM") == null)
                     Environment.SetEnvironmentVariable("TERM", "dumb");
 
-                if (inStream == null)
-                    inStream = new InternalStream(StandardHandles.STD_INPUT);
-                outStream = new InternalStream(StandardHandles.STD_OUTPUT);
-                errStream = new InternalStream(StandardHandles.STD_ERROR);
+                if (allocConsole)
+                {
+                    if (inStream == null)
+                        inStream = new InternalStream(StandardHandles.STD_INPUT);
+                    outStream = new InternalStream(StandardHandles.STD_OUTPUT);
+                    errStream = new InternalStream(StandardHandles.STD_ERROR);
 
-                oldInStream = System.Console.In;
-                oldOutStream = System.Console.Out;
-                oldErrorStream = System.Console.Error;
+                    oldInStream = System.Console.In;
+                    oldOutStream = System.Console.Out;
+                    oldErrorStream = System.Console.Error;
 
-                System.Console.SetIn(new StreamReader(inStream));
-                System.Console.SetOut(new StreamWriter(outStream) { AutoFlush = true });
-                System.Console.SetError(new StreamWriter(errStream) { AutoFlush = true });
+                    System.Console.SetIn(new StreamReader(inStream));
+                    System.Console.SetOut(new StreamWriter(outStream) {AutoFlush = true});
+                    System.Console.SetError(new StreamWriter(errStream) {AutoFlush = true});
+                }
 
                 var stdwriter = new StreamWriter(new InternalStream(StandardHandles.STD_OUTPUT)) { AutoFlush = true };
 
-                var runtimeoptions = new Dictionary<string, object>
+               
+                if (MainRuntime == null)
                 {
-                    ["PrivateBinding"] = true,
-                    ["Debug"] = false,
-                    //["Frames"] = false, ["Tracing"] = false,
-                };
-                var _env = Python.CreateRuntime(runtimeoptions);
-                var _pe = _env.GetEngine("py");
-                MainEngine = _pe;
-                //_pe.SetTrace(OnTraceback);
-
-                var scriptfolders = new List<string>();
-                var sb = new StringBuilder(4096);
-                sb.Length = 0;
-                sb.Capacity = 4096;
-                if (0 < GetPrivateProfileString("Console", "ScriptsFolders", ".", sb, sb.Capacity, _iniPath))
-                {
-                    foreach (var scname in sb.ToString().Split(";".ToCharArray(), StringSplitOptions.RemoveEmptyEntries))
+                    var runtimeoptions = new Dictionary<string, object>
                     {
-                        var scpath = Path.GetFullPath(Path.IsPathRooted(scname) ? scname : Path.Combine(_rootPath, scname));
-                        scriptfolders.Add(scpath);
+                        ["PrivateBinding"] = true,
+                        ["Debug"] = false,
+                        //["Frames"] = false, ["Tracing"] = false,
+                    };
+
+                    MainRuntime = Python.CreateRuntime(runtimeoptions);
+                    MainEngine = MainRuntime.GetEngine("py");
+
+                    var scriptfolders = new List<string>();
+                    var sb = new StringBuilder(4096);
+                    sb.Length = 0;
+                    sb.Capacity = 4096;
+                    if (0 < GetPrivateProfileString("Console", "ScriptsFolders", ".", sb, sb.Capacity, _iniPath))
+                    {
+                        foreach (var scname in sb.ToString()
+                            .Split(";".ToCharArray(), StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            var scpath = Path.GetFullPath(Path.IsPathRooted(scname)
+                                ? scname
+                                : Path.Combine(_rootPath, scname));
+                            scriptfolders.Add(scpath);
+                        }
+                    }
+                    if (scriptfolders.Count == 0)
+                        scriptfolders.Add(Path.GetFullPath(_rootPath));
+                    MainEngine.SetSearchPaths(scriptfolders.ToArray());
+
+                    string[] lines;
+                    if (GetPrivateProfileSection("Preload.Assemblies", _iniPath, out lines))
+                    {
+                        foreach (var line in lines)
+                        {
+                            var asmname = line.Trim();
+                            if (string.IsNullOrEmpty(asmname) || asmname.StartsWith(";") || asmname.StartsWith("#"))
+                                continue;
+                            Assembly.Load(new AssemblyName(Path.GetFullPath(Path.Combine(_rootPath, asmname))));
+                        }
+                    }
+                    if (GetPrivateProfileSection("Script.Assemblies", _iniPath, out lines))
+                    {
+                        foreach (var line in lines)
+                        {
+                            var asmname = line.Trim();
+                            if (string.IsNullOrEmpty(asmname) || asmname.StartsWith(";") || asmname.StartsWith("#"))
+                                continue;
+
+                            Assembly asm;
+                            if (!FindAssembly(asmname, out asm))
+                                stdwriter.WriteLine("Error adding assembly: " + asmname);
+                            else
+                                MainRuntime.LoadAssembly(asm);
+                        }
+                    }
+
+                    if (GetPrivateProfileSection("Startup.Script.Py", _iniPath, out lines) && lines != null &&
+                        lines.Length > 0)
+                    {
+                        var str = string.Join("\n", lines);
+                        var source = MainEngine.CreateScriptSourceFromString(str, SourceCodeKind.File);
+                        source.Compile().Execute();
                     }
                 }
-                if (scriptfolders.Count == 0)
-                    scriptfolders.Add(Path.GetFullPath(_rootPath));
-                _pe.SetSearchPaths(scriptfolders.ToArray());
-
-                string[] lines;
-                if (GetPrivateProfileSection("Preload.Assemblies", _iniPath, out lines))
+                if (allocConsole && MainEngine != null)
                 {
-                    foreach (var line in lines)
+                    var cmdline = new PythonCommandLine();
+                    console = new UnityConsole(cmdline);
+                    var options = new PythonConsoleOptions
                     {
-                        var asmname = line.Trim();
-                        if (string.IsNullOrEmpty(asmname) || asmname.StartsWith(";") || asmname.StartsWith("#"))
-                            continue;
-                        Assembly.Load(new AssemblyName(Path.GetFullPath(Path.Combine(_rootPath, asmname))));
-                    }
+                        PrintUsage = false,
+                        PrintVersion = false,
+                        ColorfulConsole = true,
+                        IsMta = false,
+                        Introspection = false,
+                        TabCompletion = true,
+                        AutoIndentSize = 2,
+                        AutoIndent = true,
+                        HandleExceptions = true,
+                        IgnoreEnvironmentVariables = true,
+                    };
+                    cmdline.Run(MainEngine, console, options);
                 }
-                if (GetPrivateProfileSection("Script.Assemblies", _iniPath, out lines))
-                {
-                    foreach (var line in lines)
-                    {
-                        var asmname = line.Trim();
-                        if (string.IsNullOrEmpty(asmname) || asmname.StartsWith(";") || asmname.StartsWith("#"))
-                            continue;
-
-                        Assembly asm;
-                        if (!FindAssembly(asmname, out asm))
-                            stdwriter.WriteLine("Error adding assembly: " + asmname);
-                        else
-                            _env.LoadAssembly(asm);
-                    }
-                }
-
-                var cmdline = new PythonCommandLine();
-                console = new UnityConsole(cmdline);
-                var options = new PythonConsoleOptions
-                {
-                    PrintUsage = false,
-                    PrintVersion = false,
-                    ColorfulConsole = true,
-                    IsMta = false,
-                    Introspection = false,
-                    TabCompletion = true,
-                    AutoIndentSize = 2,
-                    AutoIndent = true,
-                    HandleExceptions = true,
-                    IgnoreEnvironmentVariables = true,
-                };
-                if (GetPrivateProfileSection("Startup.Script.Py", _iniPath, out lines) && lines != null && lines.Length > 0)
-                {
-                    var scope = _env.CreateScope();
-                    var str = string.Join("\n", lines);
-                    var source = _pe.CreateScriptSourceFromString(str, SourceCodeKind.File);
-                    source.Compile().Execute(scope);
-                }
-                cmdline.Run(_pe, console, options);
-
             }
             catch (Exception ex)
             {
                 System.Console.WriteLine("Exception: " + ex.ToString());
                 System.Threading.Thread.Sleep(10000);
             }
-            MainEngine = null;
+            
             console = null;
             System.Console.SetIn(oldInStream);
             System.Console.SetOut(oldOutStream);
@@ -245,6 +257,9 @@ namespace Unity.Console
         public static void Shutdown()
         {
             Close();
+            MainEngine = null;
+            MainRuntime?.Shutdown();
+            MainRuntime = null;
             _enable = false;
         }
 

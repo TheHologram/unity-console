@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace Unity.Console.Plugin
 {
-    internal class ConsolePlugin : IEnhancedPlugin, IPlugin
+    internal class ConsolePlugin : IPlugin
     {
         private Assembly consoleAssembly;
         private Thread runThread;
@@ -24,6 +24,7 @@ namespace Unity.Console.Plugin
         static readonly bool ShowKeyAlt = false;
         static readonly bool ShowKeyShift = false;
         static bool _focusWindow = false;
+        static bool _startHidden = false;
 
         static ConsolePlugin()
         {
@@ -108,10 +109,16 @@ namespace Unity.Console.Plugin
 
                     }
 
-                    var ShowAtStartup = GetPrivateProfileInt("Console", "ShowAtStartup", 0, _iniPath) != 0;
-                    if (ShowAtStartup)
+                    var showAtStartup = GetPrivateProfileInt("Console", "ShowAtStartup", 0, _iniPath) != 0;
+                    if (showAtStartup)
                     {
-                        Startup(false);
+                        Startup(false,false);
+                    }
+                    else
+                    {
+                        var startHidden = GetPrivateProfileInt("Console", "StartHidden", 0, _iniPath) != 0;
+                        if (startHidden)
+                            Startup(false, true);
                     }
                 }
             }
@@ -120,9 +127,10 @@ namespace Unity.Console.Plugin
             }
         }
 
-        private void Startup(bool focus)
+        private void Startup(bool focus, bool hidden)
         {
             _focusWindow = focus;
+            _startHidden = hidden;
             if (runThread != null)
                 return;
             var dllPath = Path.GetFullPath(Path.Combine(_consolePath, @"Unity.Console.dll"));
@@ -196,7 +204,7 @@ namespace Unity.Console.Plugin
         {
             if (runThread == null)
             {
-                Startup(true);
+                Startup(true, false);
             }
             else
             {
@@ -205,10 +213,6 @@ namespace Unity.Console.Plugin
         }
 
         public void OnFixedUpdate()
-        {
-        }
-
-        public void OnLateUpdate()
         {
         }
 
@@ -230,14 +234,14 @@ namespace Unity.Console.Plugin
                 bool ControlDown = GetAsyncKeyState(0xA2) != 0 || GetAsyncKeyState(0xA3) != 0;
                 bool AltDown = GetAsyncKeyState(0xA4) != 0 || GetAsyncKeyState(0xA5) != 0;
                 bool ShiftDown = GetAsyncKeyState(0xA0) != 0 || GetAsyncKeyState(0xA1) != 0;
-                System.Console.WriteLine("OnUpdate {0} | {1} {2} {3} | {4} {5} {6}"
-                    , ShowKey
-                    , ControlDown, AltDown, ShiftDown
-                    , ShowKeyControl ^ ControlDown
-                    , ShowKeyAlt ^ AltDown
-                    , ShowKeyShift ^ ShiftDown
-                    );
-                System.Console.WriteLine("OnUpdate" + ControlDown + " " + AltDown + " " + ShiftDown);
+                //System.Console.WriteLine("OnUpdate {0} | {1} {2} {3} | {4} {5} {6}"
+                //    , ShowKey
+                //    , ControlDown, AltDown, ShiftDown
+                //    , ShowKeyControl ^ ControlDown
+                //    , ShowKeyAlt ^ AltDown
+                //    , ShowKeyShift ^ ShiftDown
+                //    );
+                //System.Console.WriteLine("OnUpdate" + ControlDown + " " + AltDown + " " + ShiftDown);
                 if (true
                     && !(ShowKeyControl ^ ControlDown)
                     && !(ShowKeyAlt ^ AltDown)
@@ -260,7 +264,7 @@ namespace Unity.Console.Plugin
                 {
                     var initMethod = progType.GetMethod("Initialize",
                         BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod);
-                    initMethod.Invoke(null, new object[] { _focusWindow });
+                    initMethod.Invoke(null, new object[] { _startHidden, _focusWindow });
                 }
             }
             catch (Exception)

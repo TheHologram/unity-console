@@ -27,7 +27,7 @@ namespace Unity.Python.Modules
             try
             {
                 //Console.WriteLine("CoroutineBehavior [{0}]: Run", Thread.CurrentThread.ManagedThreadId);
-                var obj2 = new GameObject(new Guid().ToString());
+                var obj2 = new GameObject(Guid.NewGuid().ToString());
                 var ex = obj2.AddComponent<CoroutineBehavior>();
                 if (ex != null)
                 {
