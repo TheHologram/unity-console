@@ -44,6 +44,11 @@ namespace Unity.Console.Plugin
                         {
                             _filters = sb.ToString().Split(",;".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
                         }
+                        // default to this exe assembly name
+                        if (_filters.Length == 0)
+                        {
+                            _filters = new[] {exeAsm.GetName().Name};
+                        }
 
                         sb.Length = 0;
                         try
