@@ -39,9 +39,8 @@ Unity-Console is an IronPython-base Debug Console for Unity
       this is best one available currently.
       IPA is written by EusthEnoptEron
       
-      I had an alternate launcher in the unity-console-legacy which 
-      relies on winmm.dll being loaded but its presence can cause problems
-      with both x86 and x64 exes in same folder.
+      The current versions can be downloaded from here:
+        https://github.com/Eusth/IPA/releases
   
   \Plugins\Console\
       Folder for most of the plugin.  Unity.Console.Dll is hard
@@ -50,9 +49,37 @@ Unity-Console is an IronPython-base Debug Console for Unity
   \Plugins\Console\Lib\
       This folder is the location for python based scripts.
       
-                  
+             
 ==========================================================================
-4. Examples
+4. Installation
+==========================================================================
+
+    Prerequisites:
+      1. Download IPA for Unity games
+         The current versions can be downloaded from here:
+          https://github.com/Eusth/IPA/releases
+          
+      2. Unpack IPA to game folder so IPA.exe is in same folder as app.
+      
+      3. Drag Game .EXE over IPA.EXE to instrument it.  This alters parts
+         of the game in the managed folder to allow the plugins. It makes
+         backups of files it changes but expect you to manually undo to 
+         uninstall.
+         
+      4. Test game still works before adding console
+
+    Install:
+      1. Download the correct version of UnityConsole for your Unity 
+         engine.  I dont know easy way to tell this.
+        
+      2. Unpack to game folder.  
+      
+      3. Edit Plugins\Console\Console.INI to your liking
+      
+      4. Add scripts Plugins\Console\lib\ for your game
+             
+==========================================================================
+5. Examples
 ==========================================================================
     
     >>> import UnityEngine
@@ -82,7 +109,7 @@ Unity-Console is an IronPython-base Debug Console for Unity
         UnityEngine.Application.CaptureScreenshot("\test.png");
         
 ==========================================================================
-5. TODO
+6. TODO
 ==========================================================================
    
   I'm sure there can be a lot done to improve some basic scripting libraries.
@@ -93,7 +120,7 @@ Unity-Console is an IronPython-base Debug Console for Unity
   the first time on subsequent reopening.
   
 ==========================================================================
-6. Contact
+7. Contact
 ==========================================================================
 
   The code is offered as-is for demonstration purposes.
