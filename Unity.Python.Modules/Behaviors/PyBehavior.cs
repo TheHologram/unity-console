@@ -126,24 +126,20 @@ namespace Unity.Python.Modules.Behaviors
 
                     case "_gameobject":
                     case "gameobject":
-                        
+                        PythonOps.SetAttr(context, inner, memberName, this.gameObject);
                         break;
 
                     case "_component":
                     case "component":
-                        
+                        PythonOps.SetAttr(context, inner, memberName, this);
                         break;
-
                 }
-            PythonOps.SetAttr(context, inner, "component", this.gameObject);
-            PythonOps.SetAttr(context, inner, "gameObject", this);
         }
 
         /// <summary>
         ///     The python callsite object class instance
         /// </summary>
         public object Inner { get; private set; }
-
 
         /// <summary>
         ///     This function is always called before any Start functions and also just after a prefab is instantiated.
@@ -250,7 +246,7 @@ namespace Unity.Python.Modules.Behaviors
 
         public override string ToString()
         {
-            return "<Gui Behavior>";
+            return "<Py Behavior>";
         }
 
     }

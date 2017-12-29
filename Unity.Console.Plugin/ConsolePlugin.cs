@@ -223,10 +223,40 @@ namespace Unity.Console.Plugin
 
         public void OnLevelWasInitialized(int level)
         {
+            OnSceneChange(level, true);
         }
 
         public void OnLevelWasLoaded(int level)
         {
+            OnSceneChange(level, false);
+        }
+
+        private bool boundSceneChange = false;
+        private MethodInfo sceneChange = null;
+        private void OnSceneChange(int level, bool init)
+        {
+            try
+            {
+                if (consoleAssembly == null) return;
+                if (!boundSceneChange) {
+                    var progType = consoleAssembly.GetType("Unity.Console.Program", false, true);
+                    if (progType != null) {
+                        sceneChange = progType.GetMethod("SceneChange",
+                            BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod, null,
+                            CallingConventions.Any, new Type[] {typeof(int), typeof(bool)}, new ParameterModifier[0]
+                        );
+                        boundSceneChange = true;
+                    }
+                }
+                sceneChange.Invoke(null, new object[] { level, init });
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine("Exception: " + ex.Message);
+            }
+            finally
+            {
+            }
         }
 
         public void OnUpdate()

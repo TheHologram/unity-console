@@ -19,7 +19,7 @@
     <Optimize>false</Optimize>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>
     <BaseIntermediateOutputPath>..\temp\uc\</BaseIntermediateOutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY5</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -30,7 +30,7 @@
     <Optimize>true</Optimize>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>
     <BaseIntermediateOutputPath>..\temp\uc\</BaseIntermediateOutputPath>
-    <DefineConstants>TRACE</DefineConstants>
+    <DefineConstants>TRACE;UNITY5</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -42,7 +42,7 @@
     <Optimize>false</Optimize>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>
     <BaseIntermediateOutputPath>..\temp\uc\</BaseIntermediateOutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY4</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -53,7 +53,7 @@
     <Optimize>true</Optimize>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>
     <BaseIntermediateOutputPath>..\temp\uc\</BaseIntermediateOutputPath>
-    <DefineConstants>TRACE</DefineConstants>
+    <DefineConstants>TRACE;UNITY4</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

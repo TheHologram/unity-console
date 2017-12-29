@@ -5,14 +5,12 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using IronPython.Hosting;
-using IronPython.Modules;
-using IronPython.Runtime;
-using IronPython.Runtime.Exceptions;
 using Microsoft.Scripting;
 using Microsoft.Scripting.Hosting;
-using Microsoft.Scripting.Hosting.Shell;
+using Microsoft.Scripting.Runtime;
 using UC;
 using UnityEngine;
+using UnityEngine.Events;
 
 //using Unity.Console.Commands;
 
@@ -23,12 +21,15 @@ namespace Unity.Console
         private static UnityConsole console;
         private static InternalStream inStream, outStream, errStream;
 
-        static readonly string _rootPath = null;
-        static readonly string _iniPath = null;
+        static readonly string _rootPath;
+        static readonly string _iniPath;
         static readonly int _startdelay = 2000;
-        static bool _enable = false;
+        static bool _enable;
 
-        static Program()
+	    private static CompiledCode sceneInit;
+	    private static ScriptScope scriptScope;
+
+	    static Program()
         {
             var exeAsm = Assembly.GetExecutingAssembly();
             if (File.Exists(exeAsm.Location))
@@ -95,29 +96,50 @@ namespace Unity.Console
             System.Threading.Thread.Sleep(waitTime);
 
             try
-            {
+			{
                 if (allocConsole && IntPtr.Zero == GetConsoleWindow())
                 {
-                    var hForeground = GetForegroundWindow();
-                    var hActiveHwnd = GetActiveWindow();
-                    var hFocusHwnd = GetFocus();
+	                var hForeground = GetForegroundWindow();
+	                var hActiveHwnd = GetActiveWindow();
+	                var hFocusHwnd = GetFocus();
+	                if (hActiveHwnd == IntPtr.Zero) hActiveHwnd = hForeground;
+	                if (hFocusHwnd == IntPtr.Zero) hFocusHwnd = hForeground;
 
-                    AllocConsole();
+	                bool restoreWindow = false;
+
+					AllocConsole();
                     SetConsoleTitle("Unity Console");
                     SetConsoleCP(65001);
                     SetConsoleOutputCP(65001);
 
-                    // reset focus
-                    if (!focusWindow)
-                    {
-                        if (hForeground != IntPtr.Zero)
-                            SetForegroundWindow(hForeground);
-                        if (hActiveHwnd != IntPtr.Zero)
-                            SetActiveWindow(hActiveHwnd);
-                        if (hFocusHwnd != IntPtr.Zero)
-                            SetFocus(hFocusHwnd);
-                    }
-                }
+	                int monitorIdx = GetPrivateProfileInt("Console", "MoveToMonitor", -1, _iniPath);
+	                if (monitorIdx > 0) {
+		                var consoleWnd = GetConsoleWindow();
+		                var monitors = GetDisplays();
+		                if (monitorIdx >= 0 && monitorIdx < monitors.Count) {
+			                var monitor = monitors[monitorIdx];
+			                RectStruct crect;
+			                GetWindowRect(consoleWnd, out crect);
+			                restoreWindow = true;
+			                focusWindow = true;
+			                int width = Math.Min(crect.right - crect.left, monitor.WorkArea.right - monitor.WorkArea.left);
+			                int height = Math.Min(crect.bottom - crect.top, monitor.WorkArea.bottom - monitor.WorkArea.top);
+			                MoveWindow(consoleWnd, monitor.WorkArea.left, monitor.WorkArea.top, width, height, false);
+		                }
+					}
+	                if (restoreWindow)
+	                {
+		                ShowWindowAsync(hForeground, SW_RESTORE);
+		                ShowWindowAsync(hForeground, SW_SHOW);
+	                }
+	                // reset focus
+	                if (focusWindow)
+	                {
+		                if (hForeground != IntPtr.Zero) SetForegroundWindow(hForeground);
+		                if (hActiveHwnd != IntPtr.Zero) SetActiveWindow(hActiveHwnd);
+		                if (hFocusHwnd != IntPtr.Zero) SetFocus(hFocusHwnd);
+	                }
+				}
             }
             catch 
             {
@@ -209,15 +231,47 @@ namespace Unity.Console
                         }
                     }
 
-                    if (GetPrivateProfileSection("Startup.Script.Py", _iniPath, out lines) && lines != null &&
+	                if (GetPrivateProfileSection("SceneChange.Script.Py", _iniPath, out lines) && lines != null && lines.Length > 0) {
+		                var trimmedlines = lines; //.Where(x => !x.StartsWith("#") && !x.StartsWith(";")).ToArray();
+		                if (trimmedlines.Length > 0) {
+			                var str = string.Join("\n", trimmedlines);
+							var source = MainEngine.CreateScriptSourceFromString(str, SourceCodeKind.File);
+			                sceneInit = source.Compile();
+			                var scope = new Scope(new Dictionary<string, object> {
+				                {"init", true}
+				                , {"level", -1}
+			                });
+			                scriptScope = MainEngine.CreateScope(scope);
+		                }
+	                }
+
+					if (GetPrivateProfileSection("Startup.Script.Py", _iniPath, out lines) && lines != null &&
                         lines.Length > 0)
                     {
-                        var str = string.Join("\n", lines);
-                        var source = MainEngine.CreateScriptSourceFromString(str, SourceCodeKind.File);
-                        source.Compile().Execute();
+	                    var trimmedlines = lines; //.Where(x => !x.StartsWith("#") && !x.StartsWith(";")).ToArray();
+	                    if (trimmedlines.Length > 0) {
+		                    var str = string.Join("\n", trimmedlines);
+		                    var source = MainEngine.CreateScriptSourceFromString(str, SourceCodeKind.File);
+		                    source.Compile().Execute();
+	                    }
                     }
                 }
-                if (allocConsole && MainEngine != null)
+#if UNITY5
+	            if (sceneInit != null) {
+		            try {
+			            var scm = typeof(UnityEngine.SceneManagement.SceneManager);
+			            var mi = scm.GetMethod("add_activeSceneChanged");
+						var action = new UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.Scene>(SceneChangeNew);
+			            mi.Invoke(null, new object[] { action });
+		            }
+					catch (Exception e) {
+			            System.Console.WriteLine(e);
+			            throw;
+		            }
+	            }
+#endif
+
+				if (allocConsole && MainEngine != null)
                 {
                     var cmdline = new PythonCommandLine();
                     console = new UnityConsole(cmdline);
@@ -240,7 +294,7 @@ namespace Unity.Console
             catch (Exception ex)
             {
                 System.Console.WriteLine("Exception: " + ex.ToString());
-                System.Threading.Thread.Sleep(10000);
+                System.Threading.Thread.Sleep(GetPrivateProfileInt("Console", "ErrorWaitTime", 10000, _iniPath));
             }
             
             console = null;
@@ -263,11 +317,32 @@ namespace Unity.Console
             _enable = false;
         }
 
-        public static bool GetPrivateProfileSection(string appName, string fileName, out string[] section)
+	    public static void SceneChange(int level, bool init)
+	    {
+		    //System.Console.WriteLine("SceneChange: {0} {1}", level, init);
+			if (_enable) {
+			    scriptScope.SetVariable("level", level);
+				scriptScope.SetVariable("init", init);
+				sceneInit?.Execute(scriptScope);
+		    }
+	    }
+#if UNITY5
+		public static void SceneChangeNew(UnityEngine.SceneManagement.Scene from, UnityEngine.SceneManagement.Scene to)
+	    {
+		    if (_enable)
+		    {
+			    scriptScope.SetVariable("level", to.buildIndex);
+			    scriptScope.SetVariable("init", true);
+			    sceneInit?.Execute(scriptScope);
+		    }
+		}
+#endif
+
+		public static bool GetPrivateProfileSection(string appName, string fileName, out string[] section)
         {
             section = null;
 
-            if (!System.IO.File.Exists(fileName))
+            if (!File.Exists(fileName))
                 return false;
 
             int MAX_BUFFER = 32767;
@@ -279,11 +354,87 @@ namespace Unity.Console
             return true;
         }
 
-        [DllImport("kernel32.dll")]
-        static extern int GetPrivateProfileInt(string lpAppName, string lpKeyName, int nDefault, string lpFileName);
+	    private delegate bool MonitorEnumDelegate(IntPtr hMonitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr dwData);
 
-        [DllImport("kernel32.dll")]
-        static extern uint GetPrivateProfileSection(string lpAppName, StringBuilder lpReturnedString, int nSize, string lpFileName);
+	    [StructLayout(LayoutKind.Sequential)]
+	    public struct RectStruct
+	    {
+		    public int left;
+		    public int top;
+		    public int right;
+		    public int bottom;
+	    }
+
+	    private const int CCHDEVICENAME = 32;
+	    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+	    internal struct MonitorInfoEx
+	    {
+		    public int Size;
+		    public RectStruct Monitor;
+		    public RectStruct WorkArea;
+		    public uint Flags;
+
+		    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = CCHDEVICENAME)]
+		    public string DeviceName;
+
+		    public void Init()
+		    {
+			    Size = 40 + 2 * CCHDEVICENAME;
+			    DeviceName = string.Empty;
+		    }
+	    }
+
+		public class DisplayInfo
+	    {
+		    public string Availability { get; set; }
+		    public string ScreenHeight { get; set; }
+		    public string ScreenWidth { get; set; }
+		    public RectStruct MonitorArea { get; set; }
+		    public RectStruct WorkArea { get; set; }
+	    }
+
+	    public class DisplayInfoCollection : List<DisplayInfo> { }
+
+	    public static DisplayInfoCollection GetDisplays()
+	    {
+		    DisplayInfoCollection col = new DisplayInfoCollection();
+
+		    EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
+			    delegate (IntPtr hMonitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr dwData)
+			    {
+				    var mi = new MonitorInfoEx();
+				    mi.Size = Marshal.SizeOf(mi);
+				    var success = GetMonitorInfo(hMonitor, ref mi);
+				    if (success)
+				    {
+					    var di = new DisplayInfo {
+						    ScreenWidth = (mi.Monitor.right - mi.Monitor.left).ToString()
+						    , ScreenHeight = (mi.Monitor.bottom - mi.Monitor.top).ToString()
+						    , MonitorArea = mi.Monitor
+						    , WorkArea = mi.WorkArea
+						    , Availability = mi.Flags.ToString()
+					    };
+					    col.Add(di);
+				    }
+				    return true;
+			    }, IntPtr.Zero);
+		    return col;
+	    }
+
+		[DllImport("user32.dll")]
+	    static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumDelegate lpfnEnum, IntPtr dwData);
+
+		[DllImport("user32.dll", CharSet = CharSet.Auto)]
+	    static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfoEx lpmi);
+
+	    [DllImport("user32.dll", SetLastError = true)]
+	    static extern bool GetWindowRect(IntPtr hwnd, out RectStruct lpRect);
+
+		[DllImport("user32.dll", SetLastError = true)]
+	    internal static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
+		[DllImport("kernel32.dll")]
+        static extern int GetPrivateProfileInt(string lpAppName, string lpKeyName, int nDefault, string lpFileName);
 
         [DllImport("kernel32.dll")]
         static extern int GetPrivateProfileSection(string lpAppName, byte[] lpReturnedString, int nSize, string lpFileName);
@@ -296,11 +447,6 @@ namespace Unity.Console
             StringBuilder lpReturnedString,
             int nSize,
             string lpFileName);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [PreserveSig]
-        private static extern uint GetModuleFileName([In] IntPtr hModule, [Out] StringBuilder lpFilename,
-            [In] [MarshalAs(UnmanagedType.U4)] int nSize);
 
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetConsoleWindow();
@@ -339,5 +485,12 @@ namespace Unity.Console
 
         [DllImport("kernel32.dll")]
         static extern bool SetConsoleOutputCP(uint wCodePageID);
-    }
+
+	    [DllImport("user32.dll")]
+	    private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+		private const int SW_RESTORE = 9;
+	    private const int SW_SHOW = 5;
+	    
+	}
 }
