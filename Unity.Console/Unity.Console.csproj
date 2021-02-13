@@ -107,7 +107,7 @@
 
   <ItemGroup Condition="!$(UnityCore)">
     <Reference Include="UnityEngine">
-      <HintPath>..\vendor\$(UnityVersion)\UnityEngine.dll</HintPath>
+      <HintPath>..\Library\$(UnityVersion)\UnityEngine.dll</HintPath>
     </Reference>
   </ItemGroup>
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
