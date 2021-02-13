@@ -15,13 +15,14 @@ namespace Unity.Python.Modules.Behaviors
         internal static object Create(CodeContext context, object function, PythonTuple args, object kwargs)
         {
             var obj = new GameObject(Guid.NewGuid().ToString());
+            UnityEngine.Object.DontDestroyOnLoad(obj);
             try
             {
                 return Add(context, obj, function, args, kwargs);
             }
             catch
             {
-                DestroyObject(obj);
+                Destroy(obj);
             }
             return null;
         }

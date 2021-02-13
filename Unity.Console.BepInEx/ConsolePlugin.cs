@@ -1,274 +1,510 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using BepInEx;
 using WindowsInput;
+using BepInEx;
 using UnityEngine;
-using UnityEngine.SceneManagement;
-using KeyCode = WindowsInput.KeyCode;
-using Input = UnityEngine.Input;
+using UnityEngine.SceneManagement; //using KeyCode = WindowsInput.KeyCode;
+//using Input = UnityEngine.Input;
+using Object = UnityEngine.Object;
+// ReSharper disable StringLiteralTypo
 
-namespace Unity.Console.Plugin
+namespace Unity.Console.BepInEx
 {
 	[BepInPlugin("a43c1bf8-9f95-4077-b8c1-fa9ec3d94dcf", "UnityConsole", "0.1.0.0")]
-	internal class ConsolePlugin : BepInEx.BaseUnityPlugin
+    // ReSharper disable once UnusedMember.Global
+    internal class ConsolePlugin : BaseUnityPlugin
 	{
-#if true
+        private static Assembly consoleAssembly;
+        private static Thread runThread;
+        private static readonly string[] Filters = new string[0];
+        private static readonly string ConsolePath;
+        private static readonly string IniPath;
+        private static bool enable;
+        private static bool debugEnable;
 
-		private Assembly consoleAssembly;
-		private Thread runThread;
-		static readonly string[] _filters = new string[0];
-		static readonly string _rootPath = null;
-		static readonly string _consolePath = null;
-		static readonly string _iniPath = null;
-		static bool _enable = false;
+		private static readonly UnityEngine.KeyCode ShowKey = UnityEngine.KeyCode.BackQuote;
+        private static readonly bool ShowKeyControl = true;
+        private static readonly bool ShowKeyAlt;
+        private static readonly bool ShowKeyShift;
+        private static bool showAtStartup;
+        private static int startdelay;
+        private static bool initialized = false;
+        private static DateTime lastKeyProcessed = DateTime.UtcNow;
 
-		static readonly KeyCode ShowKey = KeyCode.BackQuote;
-		static readonly bool ShowKeyControl = true;
-		static readonly bool ShowKeyAlt = false;
-		static readonly bool ShowKeyShift = false;
-		static bool _focusWindow = false;
-		static bool _startHidden = false;
+        static ConsolePlugin()
+        {
+            DebugLog("Console Plugin Static Constructor");
 
-		static ConsolePlugin()
-		{
-			System.Console.WriteLine("Console Plugin Static Constructor");
-
-			var exeAsm = Assembly.GetExecutingAssembly();
-			if (File.Exists(exeAsm.Location))
-			{
-				_rootPath = Path.GetDirectoryName(exeAsm.Location);
-				_consolePath = Path.Combine(_rootPath, "Console");
-				_iniPath = Path.GetFullPath(Path.Combine(_consolePath, @"Console.ini"));
-				if (File.Exists(_iniPath))
-				{
-					_enable = GetPrivateProfileInt("System", "Enable", 0, _iniPath) != 0;
-					if (_enable)
+            if (!FindModFolder("Console.ini", out var pluginfolder, out var inifile))
+            {
+                DebugLog("Unable to locate plugin folder with console.ini");
+			}
+			else
+            {
+                ConsolePath = pluginfolder;
+                IniPath = inifile;
+                if (File.Exists(IniPath))
+                {
+                    enable = GetPrivateProfileInt("System", "Enable", 0, IniPath) != 0;
+                    debugEnable = GetPrivateProfileInt("System", "Debug", 0, IniPath) != 0;
+					//if (_enable)
 					{
-						var sb = new StringBuilder(4096);
-						if (0 < GetPrivateProfileString("Console", "Filter", "", sb, sb.Capacity, _iniPath))
-						{
-							_filters = sb.ToString().Split(",;".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
-						}
-						// default to this exe assembly name
-						if (_filters.Length == 0)
-						{
-							_filters = new[] { exeAsm.GetName().Name };
-						}
+                        var sb = new StringBuilder(4096);
+                        if (0 < GetPrivateProfileString("Console", "Filter", "", sb, sb.Capacity, IniPath))
+                        {
+                            Filters = sb.ToString().Split(",;".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+                        }
 
-						sb.Length = 0;
-						try
+                        sb.Length = 0;
+                        try
+                        {
+                            if (0 < GetPrivateProfileString("Console", "ShowKey", "BackQuote", sb, sb.Capacity,
+                                IniPath))
+                            {
+                                ShowKey = (UnityEngine.KeyCode)Enum.Parse(typeof(WindowsInput.KeyCode), sb.ToString());
+                            }
+                        }
+                        catch
+                        {
+							DebugLog("Unable to parse KeyCode");
+							// ignore
+                        }
+                        ShowKeyControl = GetPrivateProfileInt("Console", "ShowKeyControl", 1, IniPath) != 0;
+                        ShowKeyAlt = GetPrivateProfileInt("Console", "ShowKeyAlt", 0, IniPath) != 0;
+                        ShowKeyShift = GetPrivateProfileInt("Console", "ShowKeyShift", 0, IniPath) != 0;
+                        DebugLog($"ShowKey {ShowKey} {ShowKeyControl} {ShowKeyAlt} {ShowKeyShift}");
+                    }
+				}
+            }
+        }
+
+		internal static void DebugLog(string msg)
+        {
+            if (!debugEnable) return;
+            System.Console.WriteLine("Console: " + msg);
+        }
+        internal static void DebugError(string msg)
+        {
+            if (!debugEnable) return;
+            System.Console.WriteLine("Console: " + msg);
+        }
+        internal static void DebugError(Exception ex)
+        {
+            if (!debugEnable) return;
+            System.Console.WriteLine("Console: " + ex.Message);
+			System.Console.WriteLine(ex.StackTrace);
+        }
+
+        // ReSharper disable once UnusedMember.Local
+        private void Awake()
+        {
+            if (!enable) return;
+			System.Console.WriteLine("Console Plugin Awake");
+            OnApplicationStart();
+        }
+
+
+		// ReSharper disable once UnusedMember.Local
+		private void OnApplicationStart()
+        {
+            if (!enable) return;
+			Object.DontDestroyOnLoad(this);
+
+			Initialize();
+
+            try
+            {
+                DebugLog($"--> Console Plugin Application Start: {enable}");
+
+                AppDomain.CurrentDomain.ProcessExit += delegate { Shutdown(); };
+                AppDomain.CurrentDomain.DomainUnload += delegate { Shutdown(); };
+
+                if (showAtStartup)
+                {
+                    ShowConsole();
+                }
+                else 
+                {
+                    InitEngine();
+                    OnSceneChange(-1, true);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLog("OnApplicationStart Error");
+                DebugLog(ex.ToString());
+            }
+            finally
+            {
+                DebugLog("<-- Console Plugin Application Start");
+            }
+        }
+
+        private static Type AssemblyGetType(Assembly asm, string name, bool ignoreCase)
+        {
+            var types = asm?.GetTypes();
+            return types?.FirstOrDefault(x => string.Compare(x.FullName, name, ignoreCase) == 0);
+        }
+
+        private static IEnumerable<string> EnumerateRootFolders()
+        {
+            var dllAsm = Assembly.GetExecutingAssembly();
+            if (!string.IsNullOrEmpty(dllAsm.Location))
+            {
+                var dirName = Path.GetDirectoryName(dllAsm.Location);
+                if (!string.IsNullOrEmpty(dirName))
+                {
+                    yield return Path.GetFullPath(dirName);
+                    dirName = Path.GetFullPath(Path.Combine(dirName, ".."));
+					yield return dirName;
+                    yield return Path.GetFullPath(Path.Combine(dirName, "plugins"));
+                }
+            }
+            var exeAsm = Assembly.GetEntryAssembly();
+            if (exeAsm != null && !string.IsNullOrEmpty(exeAsm.Location))
+            {
+                var dirName = Path.GetDirectoryName(dllAsm.Location);
+                if (!string.IsNullOrEmpty(dirName))
+                {
+                    yield return Path.GetFullPath(dirName);
+                    yield return Path.GetFullPath(Path.Combine(dirName, "BepInEx"));
+                    yield return Path.GetFullPath(Path.Combine(dirName, "Mods"));
+                    yield return Path.GetFullPath(Path.Combine(dirName, "Plugins"));
+                }
+            }
+        }
+
+		private static bool FindModFolder(string configName, out string pluginfolder, out string inifile)
+        {
+            try
+            {
+                foreach (var rootPath in EnumerateRootFolders())
+                {
+                    if (Directory.Exists(rootPath))
+                    {
+                        foreach (var subFolder in new[] { "Console", "Unity.Console" })
+                        {
+                            var configFolder = Path.Combine(rootPath, subFolder);
+                            if (Directory.Exists(configFolder))
+                            {
+                                var configfile = Path.Combine(configFolder, configName);
+                                if (File.Exists(configfile))
+                                {
+                                    pluginfolder = Path.GetFullPath(configFolder);
+                                    inifile = Path.GetFullPath(configfile);
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+			catch (Exception e)
+            {
+                DebugError(e);
+            }
+            pluginfolder = null;
+            inifile = null;
+            return false;
+        }
+
+		/// <summary>
+		/// Called during static constructor
+		/// Timing is important to capture StdIn and StdOut before Unity overrides them to redirect to log files
+		/// </summary>
+		private void Initialize()
+        {
+            if (!enable) return;
+			if (initialized) return;
+            initialized = true;
+			// load initial state
+			if (!string.IsNullOrEmpty(IniPath) && File.Exists(IniPath))
+			{
+                if (GetPrivateProfileSection("Preload.Assemblies", IniPath, out var lines))
+				{
+					foreach (var line in lines)
+					{
+						var asmname = line.Trim();
+						if (string.IsNullOrEmpty(asmname) || asmname.StartsWith(";") || asmname.StartsWith("#"))
+							continue;
+
+						AppDomain.CurrentDomain.Load(AssemblyName.GetAssemblyName(Path.GetFullPath(Path.Combine(ConsolePath, asmname))));
+					}
+				}
+
+				DebugLog("--- Preload complete");
+				startdelay = GetPrivateProfileInt("Console", "StartDelay", 0, IniPath);
+				showAtStartup = GetPrivateProfileInt("Console", "ShowAtStartup", 0, IniPath) != 0;
+			}
+
+
+			// call initialize in the Unity.Console assembly
+			try
+			{
+				DebugLog("--> Initialize");
+				var dllPath = Path.GetFullPath(Path.Combine(ConsolePath, @"Unity.Console.dll"));
+				if (!File.Exists(dllPath))
+				{
+					DebugLog("Unable to resolve to Unity.Console.dll location");
+				}
+				else
+				{
+					consoleAssembly = AppDomain.CurrentDomain.Load(AssemblyName.GetAssemblyName(dllPath));
+					if (consoleAssembly == null)
+					{
+						DebugLog("Unable to resolve to Unity.Console.dll location");
+					}
+
+
+					var progType = AssemblyGetType(consoleAssembly, "Unity.Console.Engine", true);
+					if (progType == null)
+					{
+						DebugLog("Unable to resolve to Unity.Console.Engine");
+					}
+					else
+                    {							   
+                        var variables = new Dictionary<string, object>() { {"logger", this.Logger} };
+
+						var initMethod = progType.GetMethod("Initialize",
+							BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod, null, CallingConventions.Any
+							, new[] { typeof(string), typeof(string), typeof(Action<string>), typeof(Dictionary<string, object>) }
+							, new ParameterModifier[0]
+						);
+						if (initMethod != null)
 						{
-							if (0 < GetPrivateProfileString("Console", "ShowKey", "BackQuote", sb, sb.Capacity, _iniPath))
-								ShowKey = (KeyCode)Enum.Parse(typeof(KeyCode), sb.ToString());
+							DebugLog($"Initialize: {ConsolePath}, {IniPath}");
+							initMethod.Invoke(null, new object[]
+							{
+								ConsolePath, IniPath, new Action<string>(DebugLog), variables
+							});
 						}
-						catch
+						else
 						{
+							DebugError("Unable to bind to initialize function");
 						}
-						ShowKeyControl = GetPrivateProfileInt("Console", "ShowKeyControl", 1, _iniPath) != 0;
-						ShowKeyAlt = GetPrivateProfileInt("Console", "ShowKeyAlt", 0, _iniPath) != 0;
-						ShowKeyShift = GetPrivateProfileInt("Console", "ShowKeyShift", 0, _iniPath) != 0;
 					}
 				}
 			}
+			catch (Exception ex)
+			{
+				DebugLog("--- Initialize Exception");
+				DebugError(ex);
+			}
+			finally
+			{
+				DebugLog("<-- Initialize");
+			}
 		}
 
+		//static bool OnToggle(UnityModManagerNet.UnityModManager.ModEntry modEntry, bool value)
+		//{
+		//	if (value)
+		//	{
+		//		DebugLog("Toggle Enable");
+		//		OnEnable();
+		//	}
+		//	else
+		//	{
+		//		DebugLog("Toggle Disable");
+		//		Close();
+		//	}
 
-		public ConsolePlugin() // base()
+		//	_enable = value;
+		//	return true;
+		//}
+		
+        // ReSharper disable once UnusedMember.Global
+        public void OnDisable()
 		{
-			System.Console.WriteLine("Console Plugin Constructor");
-			//var asm = System.Reflection.Assembly.GetExecutingAssembly();
-			//this.Version = asm.GetName().Version.ToString();
-		}
+			DebugLog("Console Plugin Disable");
+			enable = false;
 
-		//public static bool Initialized { get; set; }
-
-		//public string[] Filter => _filters;
-
-		public void OnDisable()
-		{
-			System.Console.WriteLine("Console Plugin Disable");
-			_enable = false;
-
-			try {
-				var version = new System.Version(Application.unityVersion.Replace("p", "."));
+			try
+			{
+				var version = new Version(Application.unityVersion.Replace("p", "."));
 				if (version.Major > 5 || (version.Major == 5 && version.Minor >= 4))
 				{
 					DisableSceneLoading();
 				}
-			}
-			catch{
+            }
+			catch
+			{
 				// ignore
 			}
-
-			Shutdown();
+            Close();
 		}
 
-		public void Awake()
+		/// <summary>
+		/// Show Console
+		/// </summary>
+		private void ShowConsole()
 		{
-			System.Console.WriteLine("Console Plugin Awake");
-			OnApplicationStart();
+            if (!enable) return;
+			DebugLog($"--> Console Plugin Show Console: {startdelay}");
+            Initialize();
+
+			if (runThread != null) return;
+			runThread = new Thread(RunThread) { IsBackground = true };
+			runThread.Start();
 		}
 
-		public void OnApplicationStart()
+
+		private void InitEngine()
 		{
+            if (!enable) return;
+			DebugLog("Console Plugin Init Engine");
 			try
-			{
-				System.Console.WriteLine($"--> Console Plugin Application Start: {_enable}");
+            {
+                Initialize();
 
-				if (!_enable) return;
-
-				if (runThread != null) return;
-
-				if (!string.IsNullOrEmpty(_iniPath) && File.Exists(_iniPath))
+				if (consoleAssembly == null) return;
+				var progType = AssemblyGetType(consoleAssembly, "Unity.Console.Engine", true);
+				if (progType != null)
 				{
-					string[] lines;
-					if (GetPrivateProfileSection("Preload.Assemblies", _iniPath, out lines))
-					{
-						foreach (var line in lines)
-						{
-							var asmname = line.Trim();
-							if (string.IsNullOrEmpty(asmname) || asmname.StartsWith(";") || asmname.StartsWith("#"))
-								continue;
-
-							AppDomain.CurrentDomain.Load(AssemblyName.GetAssemblyName(Path.GetFullPath(Path.Combine(_consolePath, asmname))));
-							//if (!cmdline.AddAssembly(asmname))
-							//    stdwriter.WriteLine("Error adding assembly: " + asmname);
-						}
-
-					}
-
-					System.Console.WriteLine("--- Preload complete");
-					var showAtStartup = GetPrivateProfileInt("Console", "ShowAtStartup", 0, _iniPath) != 0;
-					if (showAtStartup)
-					{
-						Startup(false, false);
-					}
-					else
-					{
-						var startHidden = GetPrivateProfileInt("Console", "StartHidden", 0, _iniPath) != 0;
-						if (startHidden)
-							Startup(false, true);
-					}
+					var initMethod = progType.GetMethod("InitEngine",
+						BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod);
+					initMethod?.Invoke(null, new object[0]);
 				}
 			}
 			catch (Exception ex)
 			{
-				System.Console.WriteLine("OnApplicationStart Error");
-				System.Console.WriteLine(ex.ToString());
+				DebugLog("Exception: " + ex.Message);
+				// ignored
 			}
-			finally
-			{
-				System.Console.WriteLine("<-- Console Plugin Application Start");
-			}
+
 		}
 
-		private void Startup(bool focus, bool hidden)
+        /// <summary>
+        /// Close open console window 
+        /// </summary>
+        private static void Close()
 		{
-			System.Console.WriteLine($"--> Console Plugin Startup {focus}, {hidden}");
-			_focusWindow = focus;
-			_startHidden = hidden;
-			if (runThread != null)
-				return;
-			var dllPath = Path.GetFullPath(Path.Combine(_consolePath, @"Unity.Console.dll"));
-			if (File.Exists(dllPath))
-			{
-				consoleAssembly = AppDomain.CurrentDomain.Load(AssemblyName.GetAssemblyName(dllPath));
-				runThread = new Thread(RunThread) { IsBackground = true };
-				runThread.Start();
-			}
-		}
-
-		private void Close()
-		{
-			System.Console.WriteLine($"Console Plugin Close: {runThread == null}");
-			if (runThread == null)
-				return;
-
 			try
 			{
 				if (consoleAssembly == null) return;
-				var progType = consoleAssembly.GetType("Unity.Console.Program", false, true);
+				var progType = AssemblyGetType(consoleAssembly, "Unity.Console.Engine", true);
 				if (progType != null)
 				{
-					var initMethod = progType.GetMethod("Close",
-						BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod);
-					initMethod.Invoke(null, new object[0]);
+					var closeMethod = progType.GetMethod("Close",
+						BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod, null,
+						CallingConventions.Any, new Type[0], new ParameterModifier[0]);
+					if (closeMethod == null)
+					{
+						DebugLog("Cannot find Close");
+					}
+					else
+					{
+						DebugLog("Closing");
+						closeMethod.Invoke(null, new object[0]);
+						DebugLog("Closed");
+					}
 				}
-				runThread?.Abort();
-				runThread = null;
-				//runThread?.Join(1000);
 			}
 			catch (Exception ex)
 			{
-				System.Console.WriteLine("Exception: " + ex.Message);
+				DebugLog("Exception: " + ex.Message);
 				// ignored
 			}
 			finally
 			{
+				DebugLog($"Console Plugin Close: {runThread == null}");
 			}
 		}
 
-		private void Shutdown()
+		/// <summary>
+		/// Shut everything down related to the console
+		/// </summary>
+		internal void Shutdown()
 		{
 			try
 			{
-				System.Console.WriteLine($"--> Console Plugin Shutdown: {runThread == null}");
+				DebugLog($"--> Console Plugin Shutdown: {runThread == null}");
+
 				if (runThread == null)
 					return;
-
 				if (consoleAssembly == null) return;
-				var progType = consoleAssembly.GetType("Unity.Console.Program", false, true);
+				var progType = AssemblyGetType(consoleAssembly, "Unity.Console.Engine", true);
 				if (progType != null)
 				{
 					var initMethod = progType.GetMethod("Shutdown",
 						BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod);
-					initMethod.Invoke(null, new object[0]);
+					initMethod?.Invoke(null, new object[0]);
 				}
 
-				runThread?.Abort();
-				runThread = null;
+				if (runThread != null)
+				{
+					runThread.Join(500);
+					runThread.Abort();
+					runThread = null;
+				}
 				//runThread?.Join(1000);
 			}
 			catch (Exception ex)
 			{
-				System.Console.WriteLine("Exception: " + ex.Message);
+				DebugLog("Exception: " + ex.Message);
 				// ignored
 			}
 			finally
 			{
-				System.Console.WriteLine("<-- Console Plugin Shutdown");
+				DebugLog("<-- Console Plugin Shutdown");
 			}
 
 		}
 
 		private void Toggle()
 		{
+            if (!enable) return;
+
+			if ((DateTime.UtcNow - lastKeyProcessed).TotalSeconds < 2) return;
+
+			lastKeyProcessed = DateTime.UtcNow;
+
+
+			
 			if (runThread == null)
 			{
-				Startup(true, false);
+                DebugLog("Toggle Console: Enable");
+				ShowConsole();
+				OnEnable();
 			}
 			else
 			{
+                DebugLog("Toggle Console: Disable");
 				Close();
 			}
 		}
 
-		void OnEnable()
+        private void OnEnable()
 		{
-			System.Console.WriteLine($"Console Plugin Enable {Application.unityVersion}, {Application.version}");
+   //         if (!enable) return;
+			//DebugLog($"Console Plugin Enable {Application.unityVersion}, {Application.version}");
+			//try
+			//{
+			//	var version = new Version(Application.unityVersion.Replace("p", "."));
+			//	if (version.Major > 5 || (version.Major == 5 && version.Minor >= 4))
+			//		EnableSceneLoading();
+			//}
+			//catch
+			//{
+			//	// ignore
+			//}
 
-			try {
-				var version = new System.Version(Application.unityVersion.Replace("p","."));
-				if (version.Major > 5 || (version.Major == 5 && version.Minor >= 4))
-					EnableSceneLoading();
-			}
-			catch {
-				// ignore
-			}
+			//try
+			//{
+			//	ShowConsole();
+			//	OnSceneChange(0, true);
+			//}
+			//catch (Exception a)
+			//{
+			//	DebugError("Exception during SceneChange:" + a);
+			//}
 		}
 
 		private void EnableSceneLoading()
@@ -283,127 +519,118 @@ namespace Unity.Console.Plugin
 
 		private void OnLevelFinishedLoading(Scene scene, LoadSceneMode mode)
 		{
-			System.Console.WriteLine($"Console Plugin Level Loaded {scene.name}, {mode}");
+			DebugLog($"Console Plugin Level Loaded {scene.name}, {mode}");
 
 			int.TryParse(scene.name.Replace("level", ""), out var level);
 			OnSceneChange(level, false);
 		}
 
-		public void OnLevelWasInitialized(int level)
+		private static void OnSceneChange(int level, bool init)
 		{
-			OnSceneChange(level, true);
-		}
-
-		public void OnLevelWasLoaded()
-		{
-			OnSceneChange(0, false);
-		}
-
-		public void OnLevelWasLoaded(int level)
-		{
-			OnSceneChange(level, false);
-		}
-
-		public void OnLevelWasLoaded(string level)
-		{
-			OnSceneChange(0, false);
-		}
-
-		private bool boundSceneChange = false;
-		private MethodInfo sceneChange = null;
-		private void OnSceneChange(int level, bool init)
-		{
+            if (!enable) return;
 			try
 			{
-				System.Console.WriteLine($"--> Console Plugin Run Scene Change: {level}, {init}");
+				DebugLog($"--> Console Plugin Run Scene Change: {level}, {init}");
 				if (consoleAssembly == null) return;
-				if (!boundSceneChange)
+				var progType = AssemblyGetType(consoleAssembly, "Unity.Console.Engine", true);
+				if (progType != null)
 				{
-					var progType = consoleAssembly.GetType("Unity.Console.Program", false, true);
-					if (progType != null)
-					{
-						sceneChange = progType.GetMethod("SceneChange",
-							BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod, null,
-							CallingConventions.Any, new Type[] { typeof(int), typeof(bool) }, new ParameterModifier[0]
-						);
-						boundSceneChange = true;
-					}
+					var sceneChange = progType.GetMethod("SceneChange",
+						BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod, null,
+						CallingConventions.Any, new[] { typeof(int), typeof(bool) }, new ParameterModifier[0]
+					);
+					sceneChange?.Invoke(null, new object[] { level, init });
 				}
-
-				sceneChange.Invoke(null, new object[] { level, init });
 			}
 			catch (Exception ex)
 			{
-				System.Console.WriteLine("Exception: " + ex.Message);
-				System.Console.WriteLine(ex.ToString());
+				DebugLog("Exception: " + ex.Message);
+				DebugLog(ex.ToString());
 			}
 			finally
 			{
-				System.Console.WriteLine("<-- Console Plugin Run Scene Change");
+				DebugLog("<-- Console Plugin Run Scene Change");
 			}
 
 		}
+		
 
-		public void OnUpdate()
+        // ReSharper disable once UnusedMember.Global
+        internal void Update()
 		{
-			if (!_enable)
-				return;
+			if (!enable) return;
 
-			if (WinInput.GetKey(ShowKey))
+            
+			if (Input.GetKey(ShowKey))
 			{
-				bool ControlDown = GetAsyncKeyState(0xA2) != 0 || GetAsyncKeyState(0xA3) != 0;
-				bool AltDown = GetAsyncKeyState(0xA4) != 0 || GetAsyncKeyState(0xA5) != 0;
-				bool ShiftDown = GetAsyncKeyState(0xA0) != 0 || GetAsyncKeyState(0xA1) != 0;
-				//System.Console.WriteLine("OnUpdate {0} | {1} {2} {3} | {4} {5} {6}"
-				//    , ShowKey
-				//    , ControlDown, AltDown, ShiftDown
-				//    , ShowKeyControl ^ ControlDown
-				//    , ShowKeyAlt ^ AltDown
-				//    , ShowKeyShift ^ ShiftDown
-				//    );
-				//System.Console.WriteLine("OnUpdate" + ControlDown + " " + AltDown + " " + ShiftDown);
-				if (true
-					&& !(ShowKeyControl ^ ControlDown)
-					&& !(ShowKeyAlt ^ AltDown)
-					&& !(ShowKeyShift ^ ShiftDown)
-					)
+				bool controlDown = GetAsyncKeyState(0xA2) != 0 || GetAsyncKeyState(0xA3) != 0;
+				bool altDown = GetAsyncKeyState(0xA4) != 0 || GetAsyncKeyState(0xA5) != 0;
+				bool shiftDown = GetAsyncKeyState(0xA0) != 0 || GetAsyncKeyState(0xA1) != 0;
+                DebugLog($"OnUpdate {ShowKey} | {controlDown} {altDown} {shiftDown} | {ShowKeyControl ^ controlDown} {ShowKeyAlt ^ altDown} {ShowKeyShift ^ shiftDown}");
+                DebugLog("OnUpdate" + controlDown + " " + altDown + " " + shiftDown);
+                if (   !(ShowKeyControl ^ controlDown)
+					&& !(ShowKeyAlt ^ altDown)
+					&& !(ShowKeyShift ^ shiftDown)
+				)
 				{
 					Toggle();
 				}
 			}
 		}
 
-		private void RunThread()
+		private static void RunThread()
 		{
 			try
 			{
-				System.Console.WriteLine("-> Console Plugin Run Thread");
+				DebugLog("-> Console Plugin Run Thread");
 				if (consoleAssembly == null) return;
 
-				var progType = consoleAssembly.GetType("Unity.Console.Program", false, true);
+                if (showAtStartup && startdelay > 0)
+                {
+                    Thread.Sleep(startdelay);
+                    startdelay = 0;
+                }
+
+                var progType = AssemblyGetType(consoleAssembly, "Unity.Console.Engine", true);
 				if (progType != null)
 				{
-					var initMethod = progType.GetMethod("Initialize",
-						BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod);
-                    initMethod?.Invoke(null, new object[] {_rootPath, _consolePath, _iniPath, _startHidden} );
+					var initMethod = progType.GetMethod("Run",
+						BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod, null,
+						CallingConventions.Any, new Type[0], new ParameterModifier[0]
+					);
+					if (initMethod != null)
+					{
+						DebugLog("Run Start");
+						initMethod.Invoke(null, new object[0]);
+					}
+					else
+					{
+						DebugError("Unable to bind to run function");
+					}
+				}
+				else
+				{
+					DebugError("Unable to resolve to Unity.Console.Engine");
 				}
 			}
 			catch (Exception ex)
 			{
-				System.Console.WriteLine("!-- Console Plugin Run Thread Exception");
-				System.Console.WriteLine(ex.ToString());
+				DebugLog("!-- Console Plugin Run Thread Exception");
+				DebugLog(ex.ToString());
 			}
 			finally
 			{
 				runThread = null;
-				System.Console.WriteLine("<-- Console Plugin Run Thread");
+				DebugLog("<-- Console Plugin Run Thread");
+				Close();
 			}
 
 		}
 
+		#region Extern Imports
 
 		[DllImport("kernel32.dll")]
-		static extern int GetPrivateProfileInt(string lpAppName, string lpKeyName, int nDefault, string lpFileName);
+        private static extern int GetPrivateProfileInt(string lpAppName, string lpKeyName, int nDefault, string lpFileName);
 
 		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
 		private static extern uint GetPrivateProfileString(
@@ -415,27 +642,27 @@ namespace Unity.Console.Plugin
 			string lpFileName);
 
 		[DllImport("kernel32.dll")]
-		static extern int GetPrivateProfileSection(string lpAppName, byte[] lpReturnedString, int nSize, string lpFileName);
+        private static extern int GetPrivateProfileSection(string lpAppName, byte[] lpReturnedString, int nSize, string lpFileName);
 
 		public static bool GetPrivateProfileSection(string appName, string fileName, out string[] section)
 		{
 			section = null;
 
-			if (!System.IO.File.Exists(fileName))
+			if (!File.Exists(fileName))
 				return false;
 
-			int MAX_BUFFER = 32767;
-			var bytes = new byte[MAX_BUFFER];
-			int nbytes = GetPrivateProfileSection(appName, bytes, MAX_BUFFER, fileName);
-			if ((nbytes == MAX_BUFFER - 2) || (nbytes == 0))
+			int maxBuffer = 32767;
+			var bytes = new byte[maxBuffer];
+			int nbytes = GetPrivateProfileSection(appName, bytes, maxBuffer, fileName);
+			if ((nbytes == maxBuffer - 2) || (nbytes == 0))
 				return false;
 			section = Encoding.ASCII.GetString(bytes, 0, nbytes).Trim('\0').Split('\0');
 			return true;
 		}
 
 		[DllImport("user32.dll")]
-		static extern short GetAsyncKeyState(int vKey);
-#endif
-		}
-
+        private static extern short GetAsyncKeyState(int vKey);
+		#endregion
 	}
+
+}

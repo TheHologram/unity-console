@@ -127,12 +127,12 @@ namespace Unity.Python.Modules
             foreach (var behavior in UnityEngine.Object.FindObjectsOfType<Behaviors.GuiBehavior>())
             {
                 if (behavior.gameObject != null)
-                    UnityEngine.Object.DestroyObject(behavior.gameObject);
+                    UnityEngine.Object.Destroy(behavior.gameObject);
             }
             foreach (var behavior in UnityEngine.Object.FindObjectsOfType<Behaviors.PyBehavior>())
             {
                 if (behavior.gameObject != null)
-                    UnityEngine.Object.DestroyObject(behavior.gameObject);
+                    UnityEngine.Object.Destroy(behavior.gameObject);
             }
         }
 

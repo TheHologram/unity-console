@@ -226,7 +226,7 @@ namespace UC
             GetConsoleScreenBufferInfo(outputHandle, out info);
             defaultAttribute = info.Attribute; // Not sure about this...
 
-            //logWriter = new StreamWriter(@"D:\temp\unity.log", true) {AutoFlush = true};
+            //logWriter = new StreamWriter(@"D:\temp\unity.log", true) { AutoFlush = true };
             //logWriter.WriteLine("Windows Console Driver Startup");
 
             //int mode = -1;
@@ -656,41 +656,39 @@ namespace UC
 
         public void Abort()
         {
+            //logWriter.WriteLine($"Abort {inputHandle.ToInt64():X8}");
             if (inputHandle == IntPtr.Zero)
                 return;
 
             try
             {
-                int nwrite = 0;
-                var record = new INPUT_RECORD
-                {
+                var record = new[]{ new INPUT_RECORD {
                     EventType = INPUT_RECORD_TYPE.KEY_EVENT,
-                    KeyEvent =
-                {
+                    KeyEvent = {
                     dwControlKeyState = ControlKeyStates.CTRL_PRESSED,
                     UnicodeChar = 'z',
                     wVirtualKeyCode = 'z',
                     wRepeatCount = 1,
                     bKeyDown = true
-                }
-                };
-                WriteConsoleInput(inputHandle, &record, 1, out nwrite);
-                var recordEnter = new INPUT_RECORD
-                {
+                }}};
+                WriteConsoleInput(inputHandle, record, 1, out var _);
+                var recordEnter = new[]{ new INPUT_RECORD {
                     EventType = INPUT_RECORD_TYPE.KEY_EVENT,
-                    KeyEvent =
-                {
+                    KeyEvent = {
                     dwControlKeyState = 0,
                     UnicodeChar = '\r',
                     wVirtualKeyCode = '\r',
                     wRepeatCount = 1,
                     bKeyDown = true
-                }
-                };
-                WriteConsoleInput(inputHandle, &recordEnter, 1, out nwrite);
+                }}};
+                WriteConsoleInput(inputHandle, recordEnter, 1, out var _);
+
+                //logWriter.WriteLine("Abort Complete");
             }
-            catch 
+            catch // (Exception ex)
             {
+                //logWriter.WriteLine(ex.Message);
+                //logWriter.WriteLine(ex.StackTrace);
             }
         }
 
@@ -824,8 +822,8 @@ namespace UC
         [DllImport("kernel32.dll", EntryPoint = "ReadConsoleInput", SetLastError = true, CharSet = CharSet.Unicode)]
         extern static bool ReadConsoleInput(IntPtr handle, out INPUT_RECORD record, int length, out int nread);
 
-        [DllImport("kernel32.dll", EntryPoint = "WriteConsoleInput", SetLastError = true, CharSet = CharSet.Unicode)]
-        extern static bool WriteConsoleInput(IntPtr handle, INPUT_RECORD* buffer, int length, out int nread);
+        //[DllImport("kernel32.dll", EntryPoint = "WriteConsoleInput", SetLastError = true, CharSet = CharSet.Unicode)]
+        //extern static bool WriteConsoleInput(IntPtr handle, INPUT_RECORD* buffer, int length, out int nread);
 
         [DllImport("kernel32.dll", EntryPoint = "GetLargestConsoleWindowSize", SetLastError = true, CharSet = CharSet.Unicode)]
         extern static Coord GetLargestConsoleWindowSize(IntPtr handle);
@@ -836,7 +834,9 @@ namespace UC
         [DllImport("kernel32.dll", EntryPoint = "WriteConsoleOutput", SetLastError = true, CharSet = CharSet.Unicode)]
         extern static bool WriteConsoleOutput(IntPtr handle, CharInfo[] buffer, Coord bsize, Coord bpos, ref SmallRect region);
 
-
+        /* Writes data directly to the console input buffer. */
+        [DllImport("kernel32.dll", EntryPoint = "WriteConsoleInputW", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern bool WriteConsoleInput(IntPtr hConsoleInput, INPUT_RECORD[] lpBuffer, uint nLength, out uint lpNumberOfEventsWritten);
     }
 }
 

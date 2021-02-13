@@ -1,0 +1,12 @@
+﻿{
+  "Id": "Unity.Console",
+  "DisplayName": "Unity Python Console",
+  "Author": "user",
+  "Version": "1.0.0",
+  "ManagerVersion": "1.0.0",
+  "GameVersion": "1.0.0",
+  "Requirements": [],
+  "LoadAfter": [],
+  "AssemblyName": "Unity.Console.UnityModManager.dll",
+  "EntryMethod": "Unity.Console.UnityModManager.Main.Load"
+}

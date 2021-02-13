@@ -20,11 +20,13 @@
  * ***************************************************************************/
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
+using Microsoft.Scripting;
 using Microsoft.Scripting.Hosting.Shell;
 
 namespace UC
@@ -37,13 +39,38 @@ namespace UC
         /// <summary>
         /// Class managing the command history.
         /// </summary>
-        class History
+        public class History
         {
             private readonly List<string> _list = new List<string>();
+            private System.Collections.Hashtable _hashtable = new Hashtable();
             private int _current;
             private bool _increment; // increment on Next()
+            private StreamWriter writer;
+
+            public bool NoDuplicates { get; set; }
 
             public string Current => _current >= 0 && _current < _list.Count ? _list[_current] : String.Empty;
+
+            public void Load(StreamReader reader)
+            {
+                while (!reader.EndOfStream)
+                {
+                    var line = reader.ReadLine();
+                    if (line == null) break;
+                    Add(line, true);
+                }
+            }
+            public void AttachWriter(string file, bool autoflush)
+            {
+                try
+                {
+                    this.writer = new StreamWriter(file, true) { AutoFlush = autoflush };
+                }
+                catch
+                {
+                    this.writer = null;
+                }
+            }
 
             public void Add(string line, bool setCurrentAsLast)
             {
@@ -51,6 +78,24 @@ namespace UC
                 {
                     int oldCount = _list.Count;
                     _list.Add(line);
+                    if (writer != null)
+                    {
+                        try
+                        {
+                            var write = true;
+                            if (NoDuplicates)
+                            {
+                                write = !_hashtable.ContainsKey(line);
+                                if (write) _hashtable[line] = null;
+                            }
+                            if (write) writer.WriteLine(line);
+                        }
+                        catch
+                        {
+                            writer = null;
+                        }
+                    }
+
                     if (setCurrentAsLast || _current == oldCount)
                     {
                         _current = _list.Count;
@@ -82,6 +127,12 @@ namespace UC
                     _increment = true;
                 }
                 return Current;
+            }
+
+            public void Clear()
+            {
+                _current = 0;
+                _list.Clear();
             }
         }
 
@@ -135,8 +186,9 @@ namespace UC
         /// <summary>
         /// Cursor position management
         /// </summary>
-        struct Cursor
+        class Cursor
         {
+            private WindowsConsoleDriver Driver;
             /// <summary>
             /// Beginning position of the cursor - top coordinate.
             /// </summary>
@@ -146,6 +198,11 @@ namespace UC
             /// Beginning position of the cursor - left coordinate.
             /// </summary>
             private int _anchorLeft;
+
+            public Cursor(WindowsConsoleDriver driver)
+            {
+                Driver = driver;
+            }
 
             public void Anchor()
             {
@@ -171,19 +228,18 @@ namespace UC
                 Driver.CursorTop = cursorTop;
             }
 
-            public static void Move(int delta)
+            public static void Move(WindowsConsoleDriver driver, int delta)
             {
-                int position = Driver.CursorTop*Driver.BufferWidth + Driver.CursorLeft + delta;
+                int position = driver.CursorTop*driver.BufferWidth + driver.CursorLeft + delta;
 
-                Driver.CursorLeft = position%Driver.BufferWidth;
-                Driver.CursorTop = position/Driver.BufferWidth;
+                driver.CursorLeft = position%driver.BufferWidth;
+                driver.CursorTop = position/driver.BufferWidth;
             }
         }
 
         #endregion
 
-        internal static WindowsConsoleDriver Driver { get; } = new WindowsConsoleDriver();
-
+        internal WindowsConsoleDriver Driver { get; } = new WindowsConsoleDriver();
         public TextWriter Output { get; set; }
         public TextWriter ErrorOutput { get; set; }
         protected AutoResetEvent CtrlCEvent { get; set; }
@@ -219,7 +275,7 @@ namespace UC
         /// <summary>
         /// Command history
         /// </summary>
-        private readonly History _history = new History();
+        private readonly History _history;
 
         /// <summary>
         /// Tab options available in current context
@@ -236,14 +292,13 @@ namespace UC
         /// </summary>
         private readonly CommandLine _commandLine;
 
-        public UnityConsole(CommandLine commandLine)
+        public UnityConsole(CommandLine commandLine, History history = null)
         {
-            var inStream = new UC.InternalStream(StandardHandles.STD_INPUT);
-            var outStream = new UC.InternalStream(StandardHandles.STD_OUTPUT);
-            var errStream = new UC.InternalStream(StandardHandles.STD_ERROR);
-
-            Output = new StreamWriter(outStream) {AutoFlush = true};
-            ErrorOutput = new StreamWriter(errStream) { AutoFlush = true };
+            this._history = history ?? new History();
+            this.Output = System.Console.Out;
+            this.ErrorOutput = System.Console.Error;
+            //Output = new StreamWriter(outStream) {AutoFlush = true};
+            //ErrorOutput = new StreamWriter(errStream) { AutoFlush = true };
             SetupColors(true);
 
             CreatingThread = Thread.CurrentThread;
@@ -261,12 +316,17 @@ namespace UC
 
             CtrlCEvent = new AutoResetEvent(false);
             _commandLine = commandLine;
-            _cursor = new Cursor();
+            _cursor = new Cursor(Driver);
         }
 
         public void Clear()
         {
             Driver.Clear();
+        }
+        public void ClearHistory()
+        {
+            Driver.Clear();
+            _history.Clear();
         }
 
         public void ClearInput()
@@ -591,7 +651,7 @@ namespace UC
             {
                 char c = _input[_current];
                 _current++;
-                Cursor.Move(GetCharacterSize(c));
+                Cursor.Move(Driver, GetCharacterSize(c));
             }
         }
 
@@ -601,7 +661,7 @@ namespace UC
             {
                 _current--;
                 char c = _input[_current];
-                Cursor.Move(-GetCharacterSize(c));
+                Cursor.Move(Driver, -GetCharacterSize(c));
             }
         }
 
@@ -719,8 +779,9 @@ namespace UC
 
         public void Abort()
         {
-            ClearInput();
+            this._commandLine.Terminate(0);
             Driver.Abort();
+            ClearInput();
         }
 
         /// <summary>
@@ -788,7 +849,7 @@ namespace UC
             }
         }
 
-        private static ConsoleColor PickColor(ConsoleColor best, ConsoleColor other)
+        private ConsoleColor PickColor(ConsoleColor best, ConsoleColor other)
         {
 #if SILVERLIGHT
             return best;

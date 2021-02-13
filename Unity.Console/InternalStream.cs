@@ -18,14 +18,17 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using Unity.Console;
 
 namespace UC
 {
-    public enum StandardHandles
+    public enum StandardHandles : int
     {
         STD_INPUT = -10,
         STD_OUTPUT = -11,
-        STD_ERROR = -12
+        STD_ERROR = -12,
+        STD_CONIN = -999,
+        STD_CONOUT = -998,
     }
 
     /// <summary>
@@ -44,6 +47,209 @@ namespace UC
         [DllImport("kernel32.dll", EntryPoint = "GetStdHandle", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern IntPtr GetStdHandle(StandardHandles handle);
 
+        [DllImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool SetStdHandle(StandardHandles nStdHandle, IntPtr hHandle);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr CreateFile(
+            [MarshalAs(UnmanagedType.LPTStr)] string filename,
+            [MarshalAs(UnmanagedType.U4)] EFileAccess access,
+            [MarshalAs(UnmanagedType.U4)] EFileShare share,
+            IntPtr securityAttributes, // optional SECURITY_ATTRIBUTES struct or IntPtr.Zero
+            [MarshalAs(UnmanagedType.U4)] ECreationDisposition creationDisposition,
+            [MarshalAs(UnmanagedType.U4)] EFileAttributes flagsAndAttributes,
+            IntPtr templateFile);
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetConsoleWindow();
+
+        [Flags]
+        enum EFileAccess : uint
+        {
+            //
+            // Standart Section
+            //
+
+            AccessSystemSecurity = 0x1000000,   // AccessSystemAcl access type
+            MaximumAllowed = 0x2000000,     // MaximumAllowed access type
+
+            Delete = 0x10000,
+            ReadControl = 0x20000,
+            WriteDAC = 0x40000,
+            WriteOwner = 0x80000,
+            Synchronize = 0x100000,
+
+            StandardRightsRequired = 0xF0000,
+            StandardRightsRead = ReadControl,
+            StandardRightsWrite = ReadControl,
+            StandardRightsExecute = ReadControl,
+            StandardRightsAll = 0x1F0000,
+            SpecificRightsAll = 0xFFFF,
+
+            FILE_READ_DATA = 0x0001,        // file & pipe
+            FILE_LIST_DIRECTORY = 0x0001,       // directory
+            FILE_WRITE_DATA = 0x0002,       // file & pipe
+            FILE_ADD_FILE = 0x0002,         // directory
+            FILE_APPEND_DATA = 0x0004,      // file
+            FILE_ADD_SUBDIRECTORY = 0x0004,     // directory
+            FILE_CREATE_PIPE_INSTANCE = 0x0004, // named pipe
+            FILE_READ_EA = 0x0008,          // file & directory
+            FILE_WRITE_EA = 0x0010,         // file & directory
+            FILE_EXECUTE = 0x0020,          // file
+            FILE_TRAVERSE = 0x0020,         // directory
+            FILE_DELETE_CHILD = 0x0040,     // directory
+            FILE_READ_ATTRIBUTES = 0x0080,      // all
+            FILE_WRITE_ATTRIBUTES = 0x0100,     // all
+
+            //
+            // Generic Section
+            //
+
+            GenericRead = 0x80000000,
+            GenericWrite = 0x40000000,
+            GenericExecute = 0x20000000,
+            GenericAll = 0x10000000,
+
+            SPECIFIC_RIGHTS_ALL = 0x00FFFF,
+            FILE_ALL_ACCESS =
+            StandardRightsRequired |
+            Synchronize |
+            0x1FF,
+
+            FILE_GENERIC_READ =
+            StandardRightsRead |
+            FILE_READ_DATA |
+            FILE_READ_ATTRIBUTES |
+            FILE_READ_EA |
+            Synchronize,
+
+            FILE_GENERIC_WRITE =
+            StandardRightsWrite |
+            FILE_WRITE_DATA |
+            FILE_WRITE_ATTRIBUTES |
+            FILE_WRITE_EA |
+            FILE_APPEND_DATA |
+            Synchronize,
+
+            FILE_GENERIC_EXECUTE =
+            StandardRightsExecute |
+              FILE_READ_ATTRIBUTES |
+              FILE_EXECUTE |
+              Synchronize
+        }
+
+        [Flags]
+        private enum EFileShare : uint
+        {
+            /// <summary>
+            ///
+            /// </summary>
+            None = 0x00000000,
+            /// <summary>
+            /// Enables subsequent open operations on an object to request read access.
+            /// Otherwise, other processes cannot open the object if they request read access.
+            /// If this flag is not specified, but the object has been opened for read access, the function fails.
+            /// </summary>
+            Read = 0x00000001,
+            /// <summary>
+            /// Enables subsequent open operations on an object to request write access.
+            /// Otherwise, other processes cannot open the object if they request write access.
+            /// If this flag is not specified, but the object has been opened for write access, the function fails.
+            /// </summary>
+            Write = 0x00000002,
+            /// <summary>
+            /// Enables subsequent open operations on an object to request delete access.
+            /// Otherwise, other processes cannot open the object if they request delete access.
+            /// If this flag is not specified, but the object has been opened for delete access, the function fails.
+            /// </summary>
+            Delete = 0x00000004
+        }
+
+        private enum ECreationDisposition : uint
+        {
+            /// <summary>
+            /// Creates a new file. The function fails if a specified file exists.
+            /// </summary>
+            New = 1,
+            /// <summary>
+            /// Creates a new file, always.
+            /// If a file exists, the function overwrites the file, clears the existing attributes, combines the specified file attributes,
+            /// and flags with FILE_ATTRIBUTE_ARCHIVE, but does not set the security descriptor that the SECURITY_ATTRIBUTES structure specifies.
+            /// </summary>
+            CreateAlways = 2,
+            /// <summary>
+            /// Opens a file. The function fails if the file does not exist.
+            /// </summary>
+            OpenExisting = 3,
+            /// <summary>
+            /// Opens a file, always.
+            /// If a file does not exist, the function creates a file as if dwCreationDisposition is CREATE_NEW.
+            /// </summary>
+            OpenAlways = 4,
+            /// <summary>
+            /// Opens a file and truncates it so that its size is 0 (zero) bytes. The function fails if the file does not exist.
+            /// The calling process must open the file with the GENERIC_WRITE access right.
+            /// </summary>
+            TruncateExisting = 5
+        }
+
+        [Flags]
+        private enum EFileAttributes : uint
+        {
+            Readonly = 0x00000001,
+            Hidden = 0x00000002,
+            System = 0x00000004,
+            Directory = 0x00000010,
+            Archive = 0x00000020,
+            Device = 0x00000040,
+            Normal = 0x00000080,
+            Temporary = 0x00000100,
+            SparseFile = 0x00000200,
+            ReparsePoint = 0x00000400,
+            Compressed = 0x00000800,
+            Offline = 0x00001000,
+            NotContentIndexed = 0x00002000,
+            Encrypted = 0x00004000,
+            Write_Through = 0x80000000,
+            Overlapped = 0x40000000,
+            NoBuffering = 0x20000000,
+            RandomAccess = 0x10000000,
+            SequentialScan = 0x08000000,
+            DeleteOnClose = 0x04000000,
+            BackupSemantics = 0x02000000,
+            PosixSemantics = 0x01000000,
+            OpenReparsePoint = 0x00200000,
+            OpenNoRecall = 0x00100000,
+            FirstPipeInstance = 0x00080000
+        }
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool GetConsoleMode(IntPtr hConsoleHandle, out ConsoleModes lpMode);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool SetConsoleMode(IntPtr hConsoleHandle, ConsoleModes dwMode);
+
+        [Flags]
+        private enum ConsoleModes : uint
+        {
+            ENABLE_PROCESSED_INPUT = 0x0001,
+            ENABLE_LINE_INPUT = 0x0002,
+            ENABLE_ECHO_INPUT = 0x0004,
+            ENABLE_WINDOW_INPUT = 0x0008,
+            ENABLE_MOUSE_INPUT = 0x0010,
+            ENABLE_INSERT_MODE = 0x0020,
+            ENABLE_QUICK_EDIT_MODE = 0x0040,
+            ENABLE_EXTENDED_FLAGS = 0x0080,
+            ENABLE_AUTO_POSITION = 0x0100,
+
+            ENABLE_PROCESSED_OUTPUT = 0x0001,
+            ENABLE_WRAP_AT_EOL_OUTPUT = 0x0002,
+            ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004,
+            DISABLE_NEWLINE_AUTO_RETURN = 0x0008,
+            ENABLE_LVB_GRID_WORLDWIDE = 0x0010,
+            ENABLE_VIRTUAL_TERMINAL_INPUT = 0x0200,
+        }
+
+
         IntPtr _handle;
         FileAccess _mode;
 
@@ -53,13 +259,59 @@ namespace UC
             Open(handleType);
         }
 
+        public IntPtr Handle => _handle;
+
+        public override string ToString()
+        {
+            return $"Handle: {this.Handle.ToInt64():X8}";
+        }
+
         public void Open(StandardHandles handleType)
         {
-            if (handleType == StandardHandles.STD_INPUT)
+            if (handleType == StandardHandles.STD_CONIN)
+            {
                 _mode = FileAccess.Read;
-            else
+                
+                try
+                {
+                    _handle = GetStdHandle(StandardHandles.STD_INPUT);
+                    //_handle = CreateFile("CONIN$", EFileAccess.FILE_GENERIC_READ,
+                    //    EFileShare.Read, IntPtr.Zero, ECreationDisposition.OpenExisting, 0, IntPtr.Zero);
+                }
+                catch
+                {
+                    _handle = GetStdHandle(StandardHandles.STD_INPUT);
+                }
+
+            }
+            else if (handleType == StandardHandles.STD_CONOUT)
+            {
                 _mode = FileAccess.Write;
-            _handle = GetStdHandle(handleType);
+                try
+                {
+                    _handle = GetStdHandle(StandardHandles.STD_OUTPUT);
+                    //if (GetConsoleWindow() != IntPtr.Zero)
+                    //    _handle = CreateFile("CONOUT$", EFileAccess.FILE_GENERIC_READ | EFileAccess.FILE_GENERIC_WRITE,
+                    //        EFileShare.Write, IntPtr.Zero, ECreationDisposition.OpenExisting, 0, IntPtr.Zero);
+                    //else
+                    //SetStdHandle(StandardHandles.STD_OUTPUT, _handle);
+                    //_handle = GetStdHandle(StandardHandles.STD_OUTPUT);
+                    //if (GetConsoleMode(_handle, out var cMode))
+                    //SetConsoleMode(_handle, cMode | ConsoleModes.ENABLE_VIRTUAL_TERMINAL_INPUT);
+                }
+                catch
+                {
+                    _handle = GetStdHandle(StandardHandles.STD_OUTPUT);
+                }
+            }
+            else
+            {
+                if (handleType == StandardHandles.STD_INPUT)
+                    _mode = FileAccess.Read;
+                else
+                    _mode = FileAccess.Write;
+                _handle = GetStdHandle(handleType);
+            }
         }
         
         public override bool CanRead
@@ -157,6 +409,8 @@ namespace UC
             }
             uint written = 0;
             bool result = WriteFile(_handle, buf, (uint)count, ref written, IntPtr.Zero);
+            if (!result)
+                Engine.DebugLog($"InternalStream Write Fail: {this} {count}");
 
             if (!result)
                 throw new IOException("Writing to the stream failed");

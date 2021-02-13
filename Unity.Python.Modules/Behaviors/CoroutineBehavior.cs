@@ -28,6 +28,7 @@ namespace Unity.Python.Modules
             {
                 //Console.WriteLine("CoroutineBehavior [{0}]: Run", Thread.CurrentThread.ManagedThreadId);
                 var obj2 = new GameObject(Guid.NewGuid().ToString());
+                UnityEngine.Object.DontDestroyOnLoad(obj2);
                 var ex = obj2.AddComponent<CoroutineBehavior>();
                 if (ex != null)
                 {
@@ -98,7 +99,6 @@ namespace Unity.Python.Modules
         {
             private readonly CoroutineBehavior owner;
             private object current;
-            private float oldTime;
             private int step;
 
             internal CoroutineProcIter(CoroutineBehavior owner)
@@ -143,8 +143,8 @@ namespace Unity.Python.Modules
                     return false;
                 if (num == 0)
                 {
-                    oldTime = Time.timeScale;
-                    Time.timeScale = 0;
+                    //oldTime = Time.timeScale;
+                    //Time.timeScale = 0;
                     current = new WaitForEndOfFrame();
                     step = num + 1;
                 }
@@ -166,7 +166,7 @@ namespace Unity.Python.Modules
                 }
                 if (step <= 0)
                 {
-                    Time.timeScale = oldTime;
+                    //Time.timeScale = oldTime;
                     Complete();
                 }
                 return step >= 0;

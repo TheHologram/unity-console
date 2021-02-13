@@ -1,0 +1,118 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net4</TargetFramework>
+    <Configuration Condition=" '$(Configuration)' == '' ">Unity2018Release</Configuration>
+    <Configuration Condition=" '$(Configuration)' == 'Release' ">Unity2018Release</Configuration>
+    <Configuration Condition=" '$(Configuration)' == 'Debug' ">Unity2018Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <UnityVersion Condition="$(Configuration.Contains('Unity4'))">Unity4</UnityVersion>
+    <UnityVersion Condition="$(Configuration.Contains('Unity5'))">Unity5</UnityVersion>
+    <UnityVersion Condition="$(Configuration.Contains('Unity2017'))">Unity2017</UnityVersion>
+    <UnityVersion Condition="$(Configuration.Contains('Unity2018'))">Unity2018</UnityVersion>
+    <UnityVersion Condition="$(Configuration.Contains('Unity2019'))">Unity2019</UnityVersion>
+    <UnityVersion Condition=" '$(UnityVersion)' == '' ">Unity2018</UnityVersion>
+
+    <OutputType>Library</OutputType>
+    <BaseIntermediateOutputPath>..\temp\umm\</BaseIntermediateOutputPath>
+    <ConfigType>Release</ConfigType>
+    <ConfigType Condition="$(Configuration.Contains('Debug'))">Debug</ConfigType>
+    <ConfigType Condition="$(Configuration.Contains('Release'))">Release</ConfigType>
+    <OutputPath>..\bin\$(ConfigType)\$(UnityVersion)</OutputPath>
+
+    <UnityTypeFlag>UNITY4</UnityTypeFlag>
+    <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity5'">UNITY5</UnityTypeFlag>
+    <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity2017'">UNITY_STANDALONE_WIN</UnityTypeFlag>
+    <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity2018'">UNITY_STANDALONE_WIN</UnityTypeFlag>
+    <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity2019'">UNITY_STANDALONE_WIN</UnityTypeFlag>
+    <UnityCore>false</UnityCore>
+    <UnityCore Condition="'$(UnityVersion)' == 'Unity2017'">true</UnityCore>
+    <UnityCore Condition="'$(UnityVersion)' == 'Unity2018'">true</UnityCore>
+    <UnityCore Condition="'$(UnityVersion)' == 'Unity2019'">true</UnityCore>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <FrameworkPathOverride>$(MSBuildProjectDirectory)..\Library\$(UnityVersion)</FrameworkPathOverride>
+
+    <NoStdLib>true</NoStdLib>
+    <NoCompilerStandardLib>true</NoCompilerStandardLib>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
+
+  <PropertyGroup Condition=" '$(ConfigType)' == 'Release'">
+    <DefineConstants>TRACE;$(UnityTypeFlag)</DefineConstants>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(ConfigType)' == 'Debug'">
+    <DefineConstants>TRACE;$(UnityTypeFlag);DEBUG</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\Library\Newtonsoft.Json.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="0Harmony12">
+      <HintPath>..\Library\UnityModManager\0Harmony12.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityModManager">
+      <HintPath>..\Library\UnityModManager\UnityModManager.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UnityVersion)' == 'Unity2019'">
+    <Reference Include="mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
+      <HintPath>..\Library\$(UnityVersion)\mscorlib.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
+      <HintPath>..\Library\$(UnityVersion)\System.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Core, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
+      <HintPath>..\Library\$(UnityVersion)\System.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Xml, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
+      <HintPath>..\Library\$(UnityVersion)\System.Xml.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UnityVersion)' != 'Unity2019'">
+    <Reference Include="mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
+      <HintPath>..\Library\$(UnityVersion)\mscorlib.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
+      <HintPath>..\Library\$(UnityVersion)\System.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Core, Version=3.5.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
+      <HintPath>..\Library\$(UnityVersion)\System.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Xml, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
+      <HintPath>..\Library\$(UnityVersion)\System.Xml.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\Library\$(UnityVersion)\UnityEngine.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="$(UnityCore)">
+    <Reference Include="UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Library\$(UnityVersion)\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
+</Project>
