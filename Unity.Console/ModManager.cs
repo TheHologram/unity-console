@@ -35,16 +35,16 @@ namespace Unity.Console
             internal ScriptScope ModScope;
         }
 
-        public ReadOnlyDictionary<string, ModInfo> Mods = null;
+        public Microsoft.Scripting.Utils.ReadOnlyDictionary<string, ModInfo> Mods = null;
         public ReadOnlyCollection<ModInfo> ModList = null;
         public string ModFolder { get; }
-        public ReadOnlyDictionary<string, object> Variables { get; }
+        public Microsoft.Scripting.Utils.ReadOnlyDictionary<string, object> Variables { get; }
 
         internal ModManager(string modFolder, Dictionary<string, object> variables)
         {
             this.ModFolder = modFolder;
             this.ModList = new List<ModInfo>().AsReadOnly();
-            this.Variables = new ReadOnlyDictionary<string, object>(variables);
+            this.Variables = new Microsoft.Scripting.Utils.ReadOnlyDictionary<string, object>(variables);
             Engine.DebugLog($"Mods Folder: {this.ModFolder}");
         }
 
@@ -85,7 +85,7 @@ namespace Unity.Console
                 }
             }
             ModList = mods.AsReadOnly();
-            Mods = new ReadOnlyDictionary<string, ModInfo>(dict);
+            Mods = new Microsoft.Scripting.Utils.ReadOnlyDictionary<string, ModInfo>(dict);
         }
 
         public IEnumerable<string> GetAdditionalPaths()
