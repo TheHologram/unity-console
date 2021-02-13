@@ -1,0 +1,93 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{E06F9CE1-5637-48EA-A1F9-E26485F54A4C}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Unity.Console.BepInEx</RootNamespace>
+    <AssemblyName>Unity.Console.BepInEx</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
+    <BaseIntermediateOutputPath>..\temp\ucb\</BaseIntermediateOutputPath>
+    <DebugType>pdbonly</DebugType>
+    
+    <UnityVersion>Unity5</UnityVersion>
+    <UnityVersion Condition="$(Configuration.Contains('Unity4'))">Unity4</UnityVersion>
+    <UnityVersion Condition="$(Configuration.Contains('Unity5'))">Unity5</UnityVersion>
+    <UnityVersion Condition="$(Configuration.Contains('Unity2017'))">Unity2017</UnityVersion>
+    <UnityVersion Condition="$(Configuration.Contains('Unity2018'))">Unity2018</UnityVersion>
+    <UnityVersion Condition="$(Configuration.Contains('Unity2019'))">Unity2019</UnityVersion>
+    <ConfigType>Release</ConfigType>
+    <ConfigType Condition="$(Configuration.Contains('Debug'))">Debug</ConfigType>
+    <ConfigType Condition="$(Configuration.Contains('Release'))">Release</ConfigType>
+    <UnityTypeFlag>UNITY4</UnityTypeFlag>
+    <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity5'">UNITY5</UnityTypeFlag>
+    <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity2017'">UNITY_STANDALONE_WIN</UnityTypeFlag>
+    <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity2018'">UNITY_STANDALONE_WIN</UnityTypeFlag>
+    <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity2019'">UNITY_STANDALONE_WIN</UnityTypeFlag>
+    
+    <UnityCore>false</UnityCore>
+    <UnityCore Condition="'$(UnityVersion)' == 'Unity2017'">true</UnityCore>
+    <UnityCore Condition="'$(UnityVersion)' == 'Unity2018'">true</UnityCore>
+    <UnityCore Condition="'$(UnityVersion)' == 'Unity2019'">true</UnityCore>
+    
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion Condition="'$(UnityVersion)' == 'Unity2018'">V4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion Condition="'$(UnityVersion)' == 'Unity2019'">V4.0</TargetFrameworkVersion>
+
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(ConfigType)' == 'Release'">
+    <DefineConstants>TRACE;$(UnityTypeFlag)</DefineConstants>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(ConfigType)' == 'Debug'">
+    <DefineConstants>TRACE;$(UnityTypeFlag);DEBUG</DefineConstants>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="BepInEx">
+      <HintPath>..\vendor\$(UnityVersion)\BepInEx.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup  Condition="!$(UnityCore)">
+    <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\vendor\$(UnityVersion)\UnityEngine.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup  Condition="$(UnityCore)">
+    <Reference Include="UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\vendor\$(UnityVersion)\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup  Condition="$(UnityCore)">
+    <Reference Include="UnityEngine.InputLegacyModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\vendor\$(UnityVersion)\UnityEngine.InputLegacyModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  
+ 
+  <ItemGroup>
+    <Compile Include="ConsolePlugin.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="WindowsInput.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

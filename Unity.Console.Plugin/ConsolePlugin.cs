@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using IllusionPlugin;
+using WindowsInput;
 using UnityEngine;
 
 namespace Unity.Console.Plugin
@@ -264,7 +265,7 @@ namespace Unity.Console.Plugin
             if (!_enable)
                 return;
 
-            if (Input.GetKeyDown(ShowKey))
+            if (WinInput.GetKey(ShowKey))
             {
                 bool ControlDown = GetAsyncKeyState(0xA2) != 0 || GetAsyncKeyState(0xA3) != 0;
                 bool AltDown = GetAsyncKeyState(0xA4) != 0 || GetAsyncKeyState(0xA5) != 0;
@@ -347,5 +348,6 @@ namespace Unity.Console.Plugin
         [DllImport("user32.dll")]
         static extern short GetAsyncKeyState(int vKey);
 
-    }
+	}
+
 }
