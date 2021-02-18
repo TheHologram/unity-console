@@ -170,7 +170,7 @@ namespace Unity.Console.BepInEx
             var exeAsm = Assembly.GetEntryAssembly();
             if (exeAsm != null && !string.IsNullOrEmpty(exeAsm.Location))
             {
-                var dirName = Path.GetDirectoryName(dllAsm.Location);
+                var dirName = Path.GetDirectoryName(exeAsm.Location);
                 if (!string.IsNullOrEmpty(dirName))
                 {
                     yield return Path.GetFullPath(dirName);
@@ -189,12 +189,12 @@ namespace Unity.Console.BepInEx
                 {
                     if (Directory.Exists(rootPath))
                     {
-                        foreach (var subFolder in new[] { "Console", "Unity.Console" })
+                        foreach (var subFolder in new[] { ".", "Console", "Unity.Console" })
                         {
-                            var configFolder = Path.Combine(rootPath, subFolder);
+                            var configFolder = Path.GetFullPath(Path.Combine(rootPath, subFolder));
                             if (Directory.Exists(configFolder))
                             {
-                                var configfile = Path.Combine(configFolder, configName);
+                                var configfile = Path.GetFullPath(Path.Combine(configFolder, configName));
                                 if (File.Exists(configfile))
                                 {
                                     pluginfolder = Path.GetFullPath(configFolder);

@@ -205,6 +205,7 @@ namespace Unity.Console
 				MainRuntime = Python.CreateRuntime(runtimeoptions);
 				MainEngine = MainRuntime.GetEngine("py");
 
+                var searchPlugins = Internal.GetPrivateProfileInt("Console", "SearchPluginsForMods", 1, _iniPath) != 0; 
                 // create the mod manager
                 var modFolderString = Internal.GetPrivateProfileString("Console", "ModFolder", @".\Mods", _iniPath);
                 if (!string.IsNullOrEmpty(modFolderString))
@@ -212,8 +213,23 @@ namespace Unity.Console
                     var modfolder = Path.GetFullPath(Path.Combine(_libPath, modFolderString));
                     if (Directory.Exists(modfolder))
                         mods = new ModManager(modfolder, _variables);
+                    else if (searchPlugins)
+                    {
+                        var pluginPath = Path.GetFullPath(Path.Combine(_libPath, ".."));
+                        var di = new DirectoryInfo(pluginPath);
+                        if (string.Compare(di.Name, "plugins", StringComparison.CurrentCultureIgnoreCase) == 0)
+                        {
+                            mods = new ModManager(pluginPath, _variables);
+                        }
+                        else
+                        {
+                            DebugLog($"Mod Folder '{pluginPath}' does not exist");
+                        }
+                    }
                     else
+                    {
                         DebugLog($"Mod Folder '{modfolder}' does not exist");
+                    }
                 }
                 else
                 {
