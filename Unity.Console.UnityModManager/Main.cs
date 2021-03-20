@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -186,14 +187,10 @@ namespace Unity.Console.UnityModManager
 
         static void OnApplicationStart()
         {
-            Initialize();
-
 			try
 			{
                 DebugLog($"--> Console Plugin Application Start: {_enable}");
 
-				AppDomain.CurrentDomain.ProcessExit += delegate { Shutdown(); };
-				AppDomain.CurrentDomain.DomainUnload += delegate { Shutdown(); };
 
                 if (_showAtStartup)
                 {
@@ -223,14 +220,20 @@ namespace Unity.Console.UnityModManager
         }
 
 
+		private static bool Initialized { get; set; } = false;
 		/// <summary>
 		/// Called during static constructor
 		/// Timing is important to capture StdIn and StdOut before Unity overrides them to redirect to log files
 		/// </summary>
 		private static void Initialize()
         {
+            if (Initialized) return;
+			Initialized = true;
+
+            DebugLog("--> Initialize");
+
 			// load initial state
-            if (!string.IsNullOrEmpty(_iniPath) && File.Exists(_iniPath))
+			if (!string.IsNullOrEmpty(_iniPath) && File.Exists(_iniPath))
             {
                 string[] lines;
                 if (GetPrivateProfileSection("Preload.Assemblies", _iniPath, out lines))
@@ -255,7 +258,7 @@ namespace Unity.Console.UnityModManager
 			// call initialize in the Unity.Console assembly
 			try
 			{
-                DebugLog("--> Initialize");
+                DebugLog("--- Initialize");
                 var dllPath = Path.GetFullPath(Path.Combine(_consolePath, @"Unity.Console.dll"));
                 if (!File.Exists(dllPath))
                 {
@@ -277,17 +280,18 @@ namespace Unity.Console.UnityModManager
                     }
                     else
                     {
-                        var initMethod = progType.GetMethod("Initialize",
+                        var variables = new Dictionary<string, object>() { };
+						var initMethod = progType.GetMethod("Initialize",
                             BindingFlags.Public | BindingFlags.Static | BindingFlags.InvokeMethod, null, CallingConventions.Any
-                            , new[]{ typeof(string), typeof(string), typeof(string), typeof(Action<string>)}
-                            , new ParameterModifier[0]
+							, new[] { typeof(string), typeof(string), typeof(Action<string>), typeof(Dictionary<string, object>) }
+							, new ParameterModifier[0]
                         );
                         if (initMethod != null)
                         {
                             DebugLog($"Initialize: {_rootPath}, {_consolePath}, {_iniPath}");
                             initMethod.Invoke(null, new object[]
                             {
-                                _rootPath, _consolePath, _iniPath, new Action<string>(DebugLog)
+                                _consolePath, _iniPath, new Action<string>(DebugLog), variables
                             });
                         }
                         else
@@ -296,6 +300,8 @@ namespace Unity.Console.UnityModManager
                         }
                     }
                 }
+                AppDomain.CurrentDomain.ProcessExit += delegate { Shutdown(); };
+                AppDomain.CurrentDomain.DomainUnload += delegate { Shutdown(); };
             }
 			catch (Exception ex)
             {
@@ -313,7 +319,8 @@ namespace Unity.Console.UnityModManager
 			if (value)
             {
 				DebugLog("Toggle Enable");
-                OnEnable();
+				if (_showAtStartup)
+                    OnEnable();
 			}
 			else
             {
@@ -336,20 +343,24 @@ namespace Unity.Console.UnityModManager
                 modEntry.OnSaveGUI = OnSaveGUI;
 				logger = modEntry.Logger;
 
-                if (ManagerObject == null)
+                DebugLog($"--> Console Plugin Load");
+
+				if (ManagerObject == null)
                 {
                     ManagerObject = new GameObject("UnityConsole_Manager");
                     Object.DontDestroyOnLoad(ManagerObject);
                     ManagerComponent = ManagerObject.AddComponent<Manager>();
                     ManagerObject.SetActive(true);
                 }
-				OnApplicationStart();
+				if (_showAtStartup || _startHidden)
+				    OnApplicationStart();
+
 			}
 			catch (Exception ex)
             {
 				DebugError(ex);
-				throw;
 			}
+            DebugLog($"<-- Console Plugin Load");
 			return true;
 		}
 
@@ -362,8 +373,6 @@ namespace Unity.Console.UnityModManager
         {
             settings.Save(modEntry);
 		}
-
-		//public static bool Initialized { get; set; }
 
 		//public string[] Filter => _filters;
 
@@ -392,7 +401,9 @@ namespace Unity.Console.UnityModManager
 		/// </summary>
 		private static void ShowConsole()
 		{
-            DebugLog($"--> Console Plugin Show Console: {_startHidden}, {_startdelay}");
+            Initialize();
+
+			DebugLog($"--> Console Plugin Show Console: {_startHidden}, {_startdelay}");
 			
 			if (runThread != null) return;
             runThread = new Thread(RunThread) { IsBackground = true };
@@ -402,7 +413,8 @@ namespace Unity.Console.UnityModManager
 
         private static void InitEngine()
         {
-            DebugLog($"Console Plugin Init Engine");
+            Initialize();
+			DebugLog($"Console Plugin Init Engine");
             try
 			{
                 if (consoleAssembly == null) return;
@@ -562,12 +574,12 @@ namespace Unity.Console.UnityModManager
 
 		private static void EnableSceneLoading()
 		{
-			SceneManager.sceneLoaded += OnLevelFinishedLoading;
+			//SceneManager.sceneLoaded += OnLevelFinishedLoading;
 		}
 		// only supported in 5.6 and later
 		private static void DisableSceneLoading()
 		{
-			SceneManager.sceneLoaded -= OnLevelFinishedLoading;
+			//SceneManager.sceneLoaded -= OnLevelFinishedLoading;
 		}
 
 		private static void OnLevelFinishedLoading(Scene scene, LoadSceneMode mode)

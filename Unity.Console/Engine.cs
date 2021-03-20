@@ -318,28 +318,28 @@ namespace Unity.Console
                 // final step of initialize to is to load mods
                 mods?.Load();
             }
-#if UNITY5
-			if (sceneInit != null)
-			{
-				try
-				{
-					var version = new Version(Application.unityVersion.Replace("p", ".").Replace("f", "."));
-					if (version.Major > 5 || (version.Major == 5 && version.Minor >= 4))
-					{
-						var scm = typeof(UnityEngine.SceneManagement.SceneManager);
-						var mi = scm.GetMethod("add_activeSceneChanged");
-						var action = new UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.Scene>(SceneChangeNew);
-						mi?.Invoke(null, new object[] { action });
-					}
-				}
-
-				catch (Exception e)
-				{
-					_logger(e.ToString());
-				}
-
-			}
-#endif
+//#if UNITY5
+//			if (sceneInit != null)
+//			{
+//				try
+//				{
+//					var version = new Version(Application.unityVersion.Replace("p", ".").Replace("f", "."));
+//					if (version.Major > 5 || (version.Major == 5 && version.Minor >= 4))
+//					{
+//						var scm = typeof(UnityEngine.SceneManagement.SceneManager);
+//						var mi = scm.GetMethod("add_activeSceneChanged");
+//						var action = new UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.Scene>(SceneChangeNew);
+//						mi?.Invoke(null, new object[] { action });
+//					}
+//				}
+//
+//				catch (Exception e)
+//				{
+//					_logger(e.ToString());
+//				}
+//
+//			}
+//#endif
             _logger("Initialized Engine");
 
         }
@@ -422,7 +422,8 @@ namespace Unity.Console
 						AutoIndent = true,
 						HandleExceptions = true,
 						IgnoreEnvironmentVariables = true,
-					};
+                        SkipImportSite = true,
+                    };
 					//cmdline.ScriptScope.SetVariable("_console", console);
 
                     _logger?.Invoke($"Console Run");

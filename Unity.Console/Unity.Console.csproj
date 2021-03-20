@@ -1,4 +1,4 @@
-<Project>
+﻿<Project>
   <PropertyGroup>
     <TargetFramework>net4</TargetFramework>
     <Configuration Condition=" '$(Configuration)' == '' ">Unity2018Release</Configuration>
@@ -47,6 +47,9 @@
     <DefineConstants>TRACE;$(UnityTypeFlag);DEBUG</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Program.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="IronPython">
       <HintPath>..\Library\$(UnityVersion)\IronPython.dll</HintPath>
     </Reference>
@@ -63,6 +66,7 @@
       <HintPath>..\Library\$(UnityVersion)\Microsoft.Scripting.Metadata.dll</HintPath>
     </Reference>
   </ItemGroup>
+
   <ItemGroup Condition="'$(UnityVersion)' == 'Unity2019'">
     <Reference Include="mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
       <HintPath>..\Library\$(UnityVersion)\mscorlib.dll</HintPath>
@@ -83,6 +87,12 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(UnityVersion)' != 'Unity2019'">
+    <Reference Include="Microsoft.Scripting.Core">
+      <HintPath>..\Library\$(UnityVersion)\Microsoft.Scripting.Core.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UnityVersion)' == 'Unity2018'">
     <Reference Include="mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
       <HintPath>..\Library\$(UnityVersion)\mscorlib.dll</HintPath>
       <Private>False</Private>
@@ -99,11 +109,26 @@
       <HintPath>..\Library\$(UnityVersion)\System.Xml.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Microsoft.Scripting.Core">
-      <HintPath>..\Library\$(UnityVersion)\Microsoft.Scripting.Core.dll</HintPath>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UnityVersion)' == 'Unity4'">
+    <Reference Include="mscorlib, Version=2.0.5.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e">
+      <HintPath>..\Library\$(UnityVersion)\mscorlib.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System, Version=2.0.5.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e">
+      <HintPath>..\Library\$(UnityVersion)\System.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Core, Version=2.0.5.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e">
+      <HintPath>..\Library\$(UnityVersion)\System.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Xml, Version=2.0.5.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e">
+      <HintPath>..\Library\$(UnityVersion)\System.Xml.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
-  
 
   <ItemGroup Condition="!$(UnityCore)">
     <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">

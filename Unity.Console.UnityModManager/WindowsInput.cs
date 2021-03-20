@@ -11,6 +11,7 @@
     This will work on Windows PC Platform 
 */
 using System.Collections;
+using UnityEngine;
 
 #if (UNITY_STANDALONE_WIN && !UNITY_EDITOR_OSX)
 using System.Runtime.InteropServices;
@@ -222,7 +223,7 @@ namespace WindowsInput
 		public static bool GetKey(KeyCode key)
 		{
 #if (UNITY_STANDALONE_WIN && !UNITY_EDITOR_OSX)
-            int VK = KeyCodeToVkey(key);
+			int VK = KeyCodeToVkey(key);
             if (VK != 0)
                 return (GetAsyncKeyState(VK) != 0); 
             //else
@@ -269,7 +270,6 @@ namespace WindowsInput
 
 	}
 
-#if (UNITY_STANDALONE_WIN && !UNITY_EDITOR_OSX)
 	public enum KeyCode
 	{
 		A = 0x61,
@@ -594,5 +594,4 @@ namespace WindowsInput
 		Y = 0x79,
 		Z = 0x7a
 	}
-#endif
 }

@@ -72,6 +72,12 @@ namespace UC
                 }
             }
 
+            public void Close()
+            {
+                this.writer?.Dispose();
+                this.writer = null;
+            }
+
             public void Add(string line, bool setCurrentAsLast)
             {
                 if (!string.IsNullOrEmpty(line))
@@ -782,6 +788,7 @@ namespace UC
             this._commandLine.Terminate(0);
             Driver.Abort();
             ClearInput();
+            _history.Close();
         }
 
         /// <summary>

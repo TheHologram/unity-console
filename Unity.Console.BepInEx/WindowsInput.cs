@@ -11,6 +11,7 @@
     This will work on Windows PC Platform 
 */
 using System.Collections;
+using UnityEngine;
 
 #if (UNITY_STANDALONE_WIN && !UNITY_EDITOR_OSX)
 using System.Runtime.InteropServices;
@@ -269,7 +270,6 @@ namespace WindowsInput
 
 	}
 
-#if (UNITY_STANDALONE_WIN && !UNITY_EDITOR_OSX)
 	public enum KeyCode
 	{
 		A = 0x61,
@@ -594,5 +594,4 @@ namespace WindowsInput
 		Y = 0x79,
 		Z = 0x7a
 	}
-#endif
 }

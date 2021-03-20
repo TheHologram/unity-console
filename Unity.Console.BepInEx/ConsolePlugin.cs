@@ -509,12 +509,12 @@ namespace Unity.Console.BepInEx
 
 		private void EnableSceneLoading()
 		{
-			SceneManager.sceneLoaded += OnLevelFinishedLoading;
+			//SceneManager.sceneLoaded += OnLevelFinishedLoading;
 		}
 		// only supported in 5.6 and later
 		private void DisableSceneLoading()
 		{
-			SceneManager.sceneLoaded -= OnLevelFinishedLoading;
+			//SceneManager.sceneLoaded -= OnLevelFinishedLoading;
 		}
 
 		private void OnLevelFinishedLoading(Scene scene, LoadSceneMode mode)

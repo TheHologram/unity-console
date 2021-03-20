@@ -19,11 +19,12 @@
     <ConfigType Condition="$(Configuration.Contains('Release'))">Release</ConfigType>
     <OutputPath>..\bin\$(ConfigType)\$(UnityVersion)</OutputPath>
 
-    <UnityTypeFlag>UNITY4</UnityTypeFlag>
+    <UnityTypeFlag>UNITY_STANDALONE_WIN</UnityTypeFlag>
+    <!--<UnityTypeFlag>UNITY4</UnityTypeFlag>
     <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity5'">UNITY5</UnityTypeFlag>
     <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity2017'">UNITY_STANDALONE_WIN</UnityTypeFlag>
     <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity2018'">UNITY_STANDALONE_WIN</UnityTypeFlag>
-    <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity2019'">UNITY_STANDALONE_WIN</UnityTypeFlag>
+    <UnityTypeFlag Condition="'$(UnityVersion)' == 'Unity2019'">UNITY_STANDALONE_WIN</UnityTypeFlag>-->
     <UnityCore>false</UnityCore>
     <UnityCore Condition="'$(UnityVersion)' == 'Unity2017'">true</UnityCore>
     <UnityCore Condition="'$(UnityVersion)' == 'Unity2018'">true</UnityCore>
@@ -82,7 +83,7 @@
     </Reference>
   </ItemGroup>
 
-  <ItemGroup Condition="'$(UnityVersion)' != 'Unity2019'">
+  <ItemGroup Condition="'$(UnityVersion)' == 'Unity2018'">
     <Reference Include="mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
       <HintPath>..\Library\$(UnityVersion)\mscorlib.dll</HintPath>
       <Private>False</Private>
@@ -96,6 +97,25 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="System.Xml, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
+      <HintPath>..\Library\$(UnityVersion)\System.Xml.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UnityVersion)' == 'Unity4'">
+    <Reference Include="mscorlib, Version=2.0.5.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e">
+      <HintPath>..\Library\$(UnityVersion)\mscorlib.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System, Version=2.0.5.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e">
+      <HintPath>..\Library\$(UnityVersion)\System.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Core, Version=2.0.5.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e">
+      <HintPath>..\Library\$(UnityVersion)\System.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Xml, Version=2.0.5.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e">
       <HintPath>..\Library\$(UnityVersion)\System.Xml.dll</HintPath>
       <Private>False</Private>
     </Reference>
